@@ -79,7 +79,7 @@ lint:
 .PHONY: docker
 # build docker image
 docker:
-	docker build -t QuotaLane:$(VERSION) .
+	docker build -t quotalane:$(VERSION) .
 
 .PHONY: all
 # generate all
