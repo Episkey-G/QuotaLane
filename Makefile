@@ -81,6 +81,28 @@ lint:
 docker:
 	docker build -t quotalane:$(VERSION) .
 
+.PHONY: migrate
+# run database migrations
+migrate:
+	@echo "Running database migrations..."
+	@bash scripts/migrate.sh up
+
+.PHONY: migrate-up
+# migrate database up one version
+migrate-up:
+	@bash scripts/migrate.sh up 1
+
+.PHONY: migrate-down
+# migrate database down one version
+migrate-down:
+	@bash scripts/migrate.sh down 1
+
+.PHONY: seed
+# seed database with initial data
+seed:
+	@echo "Seeding database with initial data..."
+	@bash scripts/seed.sh
+
 .PHONY: all
 # generate all
 all:

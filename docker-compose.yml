@@ -1,0 +1,64 @@
+# QuotaLane 开发环境集合
+# 使用方法：
+#   启动: docker-compose up -d
+#   停止: docker-compose down
+#   查看: docker-compose ps
+#   日志: docker-compose logs -f
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: quotalane-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: quotalane
+      MYSQL_CHARSET: utf8mb4
+      MYSQL_COLLATION: utf8mb4_unicode_ci
+    volumes:
+      # 数据持久化
+      - quotalane-mysql-data:/var/lib/mysql
+      # 自定义配置
+      - ./configs/mysql.cnf:/etc/mysql/conf.d/custom.cnf:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - quotalane-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: quotalane-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      # 数据持久化
+      - quotalane-redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - quotalane-network
+
+volumes:
+  quotalane-mysql-data:
+    name: quotalane-mysql-data
+  quotalane-redis-data:
+    name: quotalane-redis-data
+
+networks:
+  quotalane-network:
+    name: quotalane-network
+    driver: bridge
