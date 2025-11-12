@@ -3,6 +3,13 @@ FROM golang:1.24 AS builder
 COPY . /src
 WORKDIR /src
 
+# Install Wire for dependency injection code generation
+RUN go install github.com/google/wire/cmd/wire@latest
+
+# Generate Wire code before building
+RUN make wire
+
+# Build the application
 RUN GOPROXY=https://goproxy.cn make build
 
 FROM debian:stable-slim
