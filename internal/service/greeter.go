@@ -1,3 +1,5 @@
+// Package service implements the gRPC service interfaces.
+// It handles request validation and calls business logic.
 package service
 
 import (

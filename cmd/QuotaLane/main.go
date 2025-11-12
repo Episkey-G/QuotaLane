@@ -1,3 +1,5 @@
+// Package main is the entry point of QuotaLane service.
+// It initializes the Kratos application with gRPC and HTTP servers.
 package main
 
 import (
@@ -63,7 +65,11 @@ func main() {
 			file.NewSource(flagconf),
 		),
 	)
-	defer c.Close()
+	defer func() {
+		if err := c.Close(); err != nil {
+			log.Errorf("failed to close config: %v", err)
+		}
+	}()
 
 	if err := c.Load(); err != nil {
 		panic(err)

@@ -1,3 +1,5 @@
+// Package data provides data access layer implementations.
+// It handles database connections and data persistence.
 package data
 
 import (

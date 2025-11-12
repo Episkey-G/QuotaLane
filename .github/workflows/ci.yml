@@ -43,13 +43,17 @@ jobs:
           cache: true
 
       - name: Download dependencies
-        run: go mod download
+        run: |
+          go mod download
+          go mod verify
 
       - name: Install Wire
         run: go install github.com/google/wire/cmd/wire@latest
 
       - name: Generate Wire code
-        run: make wire
+        run: |
+          go mod tidy
+          make wire
 
       - name: Run tests
         run: make test

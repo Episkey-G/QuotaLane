@@ -1,3 +1,5 @@
+// Package server configures and starts the gRPC and HTTP servers.
+// It registers services and applies middleware.
 package server
 
 import (
