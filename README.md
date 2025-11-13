@@ -130,24 +130,109 @@ QuotaLane 是 Claude Relay Service 的 Go 重构版本，旨在:
 
 ## 🚀 快速开始
 
-### 前置要求
+### 🐳 方式一: Docker Compose 一键启动 (推荐)
 
-- Go 1.22+ (推荐 1.24+)
-- MySQL 8.0+
-- Redis 6.0+
-- Docker & Docker Compose (可选)
+**前置要求**:
+- Docker 20.10+
+- Docker Compose 2.0+
 
-### 安装步骤
+**启动步骤**:
 
 #### 1. 克隆仓库
+```bash
+git clone https://github.com/Episkey-G/QuotaLane.git
+cd QuotaLane
+```
 
+#### 2. 配置环境变量
+```bash
+# 复制环境变量模板
+cp .env.example .env
+
+# 编辑 .env 文件（⚠️ 生产环境必须修改 JWT_SECRET 和 ENCRYPTION_KEY）
+vim .env
+```
+
+**重要配置说明**:
+- `JWT_SECRET`: JWT 签名密钥（至少 32 字符，生成: `openssl rand -base64 32`）
+- `ENCRYPTION_KEY`: 数据加密密钥（精确 32 字符，生成: `openssl rand -hex 16`）
+- `MYSQL_ROOT_PASSWORD`: MySQL root 密码
+- `QUOTALANE_ENV`: 运行环境（development/production）
+
+#### 3. 一键启动所有服务
+```bash
+docker-compose up -d
+```
+
+这将启动以下 5 个容器:
+- ✅ **app** - QuotaLane 应用 (端口: 8000, 9000, 9090)
+- ✅ **mysql** - MySQL 8.0 数据库 (端口: 3306)
+- ✅ **redis** - Redis 7 缓存 (端口: 6379)
+- ✅ **prometheus** - Prometheus 监控 (端口: 9091)
+- ✅ **grafana** - Grafana 可视化 (端口: 3000)
+
+#### 4. 查看日志
+```bash
+# 查看应用启动日志
+docker-compose logs -f app
+
+# 等待日志显示 "Database connected" 和 "Redis connected"
+```
+
+#### 5. 访问服务
+
+| 服务 | 地址 | 说明 |
+|------|------|------|
+| **应用 HTTP** | http://localhost:8000 | HTTP API 端口 |
+| **应用 gRPC** | localhost:9000 | gRPC 服务端口 |
+| **Prometheus Metrics** | http://localhost:9090 | 应用指标端口 (Story 7.1) |
+| **Prometheus UI** | http://localhost:9091 | Prometheus Web 界面 |
+| **Grafana** | http://localhost:3000 | 监控仪表盘 (默认: admin/admin) |
+
+#### 6. 验证服务
+```bash
+# 检查所有容器状态（应全部显示 "Up" 或 "healthy"）
+docker-compose ps
+
+# 验证应用端口可访问（临时方案，Story 7.3 后使用 /health 端点）
+nc -zv localhost 8000
+
+# 验证数据库迁移成功
+docker exec -it quotalane-mysql mysql -uroot -proot -D quotalane -e "SHOW TABLES;"
+```
+
+#### 7. 停止和清理
+```bash
+# 停止服务（保留数据）
+docker-compose down
+
+# 停止并删除所有数据卷（⚠️ 会删除数据库数据）
+docker-compose down -v
+
+# 重新构建应用镜像
+docker-compose build --no-cache app
+```
+
+---
+
+### 🛠 方式二: 本地开发环境
+
+**前置要求**:
+- Go 1.24+ (项目要求)
+- MySQL 8.0+
+- Redis 6.0+
+- protoc 3.x+
+- golang-migrate/migrate v4
+
+**安装步骤**:
+
+#### 1. 克隆仓库
 ```bash
 git clone https://github.com/Episkey-G/QuotaLane.git
 cd QuotaLane
 ```
 
 #### 2. 安装依赖
-
 ```bash
 # 安装 Go 依赖
 go mod download
@@ -157,7 +242,6 @@ make init
 ```
 
 #### 3. 配置文件
-
 ```bash
 # 复制配置模板
 cp configs/config.yaml configs/config.local.yaml
@@ -167,24 +251,30 @@ vim configs/config.local.yaml
 ```
 
 #### 4. 启动数据库 (Docker Compose)
-
 ```bash
-# 启动 MySQL 和 Redis
+# 仅启动 MySQL 和 Redis
 docker-compose up -d mysql redis
 ```
 
-#### 5. 生成代码
-
+#### 5. 数据库迁移
 ```bash
-# 生成 Wire 依赖注入代码
-make wire
+# 执行数据库迁移
+bash scripts/migrate.sh up
 
-# 生成 Proto 代码 (如需修改 API)
-make proto
+# 插入种子数据
+bash scripts/seed.sh
 ```
 
-#### 6. 编译运行
+#### 6. 生成代码
+```bash
+# 生成 Proto 代码
+make proto
 
+# 生成 Wire 依赖注入代码
+make wire
+```
+
+#### 7. 编译运行
 ```bash
 # 编译项目
 make build
@@ -197,14 +287,73 @@ make build
 - **HTTP**: http://localhost:8000
 - **gRPC**: localhost:9000
 
-#### 7. 验证服务
-
+#### 8. 验证服务
 ```bash
 # 测试 HTTP 端点
 curl http://localhost:8000/helloworld/QuotaLane
 
 # 预期响应
 {"message":"Hello QuotaLane"}
+```
+
+---
+
+### 🔧 常见问题排查
+
+#### 端口占用
+```bash
+# 检查端口占用
+lsof -i :8000
+lsof -i :3306
+lsof -i :6379
+
+# 停止占用端口的进程
+kill -9 <PID>
+```
+
+#### 数据库连接失败
+```bash
+# 查看 app 容器日志
+docker-compose logs -f app
+
+# 检查 MySQL 容器状态
+docker-compose ps mysql
+
+# 确认 MySQL 健康检查通过
+docker inspect quotalane-mysql | grep Health
+```
+
+#### Proto/Wire 代码生成失败
+```bash
+# 重新构建应用镜像（清除缓存）
+docker-compose build --no-cache app
+
+# 查看构建日志
+docker-compose build app
+```
+
+#### 配置文件找不到
+```bash
+# 确认配置文件存在
+ls -la configs/config.yaml
+
+# 确认 docker-compose.yml 正确挂载到 /data/conf
+docker exec -it quotalane-app ls -la /data/conf
+```
+
+#### 数据持久化测试
+```bash
+# 插入测试数据
+docker exec -it quotalane-mysql mysql -uroot -proot -D quotalane -e "SELECT * FROM plans;"
+
+# 停止服务（不删除数据卷）
+docker-compose down
+
+# 重启服务
+docker-compose up -d
+
+# 验证数据仍然存在
+docker exec -it quotalane-mysql mysql -uroot -proot -D quotalane -e "SELECT COUNT(*) FROM plans;"
 ```
 
 ---

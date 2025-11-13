@@ -1,0 +1,25 @@
+# Prometheus 配置文件
+# QuotaLane 开发环境
+
+global:
+  scrape_interval: 15s # 抓取间隔
+  evaluation_interval: 15s # 规则评估间隔
+  external_labels:
+    cluster: 'quotalane-dev'
+    environment: 'development'
+
+# 抓取配置
+scrape_configs:
+  # QuotaLane 应用 metrics
+  - job_name: 'quotalane'
+    static_configs:
+      - targets: ['app:9090']
+        labels:
+          service: 'quotalane'
+    # 注意：当前应用 metrics 端点在 Story 7.1 中实现
+    # 在此之前，此配置会导致抓取失败，但不影响 Prometheus 运行
+
+  # Prometheus 自身 metrics
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
