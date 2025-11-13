@@ -20,6 +20,29 @@ jobs:
           go-version: '1.24'
           cache: true
 
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+          protoc --version
+
+      - name: Install proto plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+          go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@latest
+          go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
+          go install github.com/envoyproxy/protoc-gen-validate@latest
+
+      - name: Generate Proto code
+        run: make proto
+
+      - name: Install Wire
+        run: go install github.com/google/wire/cmd/wire@latest
+
+      - name: Generate Wire code
+        run: make wire
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
@@ -44,13 +67,28 @@ jobs:
           go mod download
           go mod verify
 
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+          protoc --version
+
+      - name: Install proto plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+          go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@latest
+          go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
+          go install github.com/envoyproxy/protoc-gen-validate@latest
+
+      - name: Generate Proto code
+        run: make proto
+
       - name: Install Wire
         run: go install github.com/google/wire/cmd/wire@latest
 
       - name: Generate Wire code
-        run: |
-          go mod tidy
-          make wire
+        run: make wire
 
       - name: Run tests
         run: make test
@@ -75,6 +113,23 @@ jobs:
         with:
           go-version: '1.24'
           cache: true
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+          protoc --version
+
+      - name: Install proto plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+          go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@latest
+          go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
+          go install github.com/envoyproxy/protoc-gen-validate@latest
+
+      - name: Generate Proto code
+        run: make proto
 
       - name: Install Wire
         run: go install github.com/google/wire/cmd/wire@latest
