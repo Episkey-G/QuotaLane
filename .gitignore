@@ -38,6 +38,9 @@ wire_gen.go
 *_grpc.pb.go
 *_http.pb.go
 
+# OpenAPI/Swagger generated files
+openapi.yaml
+
 # Develop tools
 .vscode/
 .idea/

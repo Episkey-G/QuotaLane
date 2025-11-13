@@ -9,8 +9,6 @@ import (
 	"QuotaLane/internal/conf"
 
 	"github.com/go-kratos/kratos/v2"
-	"github.com/go-kratos/kratos/v2/config"
-	"github.com/go-kratos/kratos/v2/config/file"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/tracing"
 	"github.com/go-kratos/kratos/v2/transport/grpc"
@@ -32,7 +30,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&flagconf, "conf", "../../configs", "config path, eg: -conf config.yaml")
+	flag.StringVar(&flagconf, "conf", "../../configs/config.yaml", "config path, eg: -conf config.yaml")
 }
 
 func newApp(logger log.Logger, gs *grpc.Server, hs *http.Server) *kratos.App {
@@ -60,24 +58,11 @@ func main() {
 		"trace.id", tracing.TraceID(),
 		"span.id", tracing.SpanID(),
 	)
-	c := config.New(
-		config.WithSource(
-			file.NewSource(flagconf),
-		),
-	)
-	defer func() {
-		if err := c.Close(); err != nil {
-			log.Errorf("failed to close config: %v", err)
-		}
-	}()
 
-	if err := c.Load(); err != nil {
-		panic(err)
-	}
-
-	var bc conf.Bootstrap
-	if err := c.Scan(&bc); err != nil {
-		panic(err)
+	// Load configuration using Viper with environment variable and CLI flag support
+	bc, err := conf.NewBootstrap(flagconf)
+	if err != nil {
+		log.Fatalf("failed to load configuration: %v", err)
 	}
 
 	app, cleanup, err := wireApp(bc.Server, bc.Data, logger)

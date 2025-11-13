@@ -1,15 +1,30 @@
 server:
   http:
     addr: 0.0.0.0:8000
-    timeout: 1s
+    timeout: 10m
   grpc:
     addr: 0.0.0.0:9000
-    timeout: 1s
+    timeout: 10m
+
 data:
   database:
     driver: mysql
+    # Use MYSQL_DSN environment variable in production
     source: root:root@tcp(127.0.0.1:3306)/quotalane?charset=utf8mb4&parseTime=True&loc=Local
   redis:
     addr: 127.0.0.1:6379
     read_timeout: 0.2s
     write_timeout: 0.2s
+
+auth:
+  jwt:
+    # Set JWT_SECRET environment variable (required)
+    secret: ""
+    expires: 24h
+  encryption:
+    # Set ENCRYPTION_KEY environment variable (required, 32 characters)
+    key: ""
+
+log:
+  level: info
+  format: json
