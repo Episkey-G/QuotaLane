@@ -3,10 +3,30 @@ FROM golang:1.24 AS builder
 COPY . /src
 WORKDIR /src
 
+# Install protoc compiler
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    unzip \
+    wget \
+    && PROTOC_VERSION=31.1 \
+    && wget -q https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip -O /tmp/protoc.zip \
+    && unzip -q /tmp/protoc.zip -d /usr/local \
+    && rm /tmp/protoc.zip \
+    && apt-get purge -y --auto-remove unzip wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install protoc Go plugins
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest \
+    && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest \
+    && go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@latest \
+    && go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
+
 # Install Wire for dependency injection code generation
 RUN go install github.com/google/wire/cmd/wire@latest
 
-# Generate Wire code before building
+# Generate Proto code first (required for Wire)
+RUN make proto
+
+# Generate Wire code
 RUN make wire
 
 # Build the application
