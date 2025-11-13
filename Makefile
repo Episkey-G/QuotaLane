@@ -61,6 +61,16 @@ proto:
 	make api;
 	make config;
 
+.PHONY: proto-clean
+# clean generated proto files
+proto-clean:
+	@echo "Cleaning generated proto files..."
+	@find api -name "*.pb.go" -delete
+	@find api -name "*_grpc.pb.go" -delete
+	@find api -name "*_http.pb.go" -delete
+	@find internal -name "*.pb.go" -delete
+	@echo "Proto files cleaned successfully"
+
 .PHONY: wire
 # generate wire code
 wire:
@@ -102,6 +112,18 @@ migrate-down:
 seed:
 	@echo "Seeding database with initial data..."
 	@bash scripts/seed.sh
+
+.PHONY: redis-cli
+# open Redis CLI in container
+redis-cli:
+	@docker exec -it quotalane-redis redis-cli
+
+.PHONY: redis-flush
+# flush all Redis cache data
+redis-flush:
+	@echo "Flushing all Redis cache data..."
+	@docker exec -it quotalane-redis redis-cli FLUSHALL
+	@echo "Redis cache cleared successfully"
 
 .PHONY: all
 # generate all

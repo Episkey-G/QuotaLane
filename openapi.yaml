@@ -3,15 +3,13 @@
 
 openapi: 3.0.3
 info:
-    title: Greeter API
-    description: The greeting service definition.
+    title: ""
     version: 0.0.1
 paths:
     /helloworld/{name}:
         get:
             tags:
                 - Greeter
-                - subgroup
             description: Sends a greeting
             operationId: Greeter_SayHello
             parameters:
@@ -27,8 +25,1815 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/helloworld.v1.HelloReply'
+    /v1/accounts:
+        get:
+            tags:
+                - AccountService
+            description: ListAccounts 查询账号列表
+            operationId: AccountService_ListAccounts
+            parameters:
+                - name: page
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: provider
+                  in: query
+                  schema:
+                    type: integer
+                    format: enum
+                - name: status
+                  in: query
+                  schema:
+                    type: integer
+                    format: enum
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.ListAccountsResponse'
+        post:
+            tags:
+                - AccountService
+            description: CreateAccount 创建新账号
+            operationId: AccountService_CreateAccount
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.v1.CreateAccountRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.CreateAccountResponse'
+    /v1/accounts/{id}:
+        get:
+            tags:
+                - AccountService
+            description: GetAccount 获取账号详情
+            operationId: AccountService_GetAccount
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.GetAccountResponse'
+        put:
+            tags:
+                - AccountService
+            description: UpdateAccount 更新账号信息
+            operationId: AccountService_UpdateAccount
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.v1.UpdateAccountRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.UpdateAccountResponse'
+        delete:
+            tags:
+                - AccountService
+            description: DeleteAccount 删除账号
+            operationId: AccountService_DeleteAccount
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.DeleteAccountResponse'
+    /v1/accounts/{id}/refresh:
+        post:
+            tags:
+                - AccountService
+            description: RefreshToken 刷新OAuth Token
+            operationId: AccountService_RefreshToken
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.v1.RefreshTokenRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.RefreshTokenResponse'
+    /v1/accounts/{id}/test:
+        post:
+            tags:
+                - AccountService
+            description: TestAccount 测试账号连通性和健康度
+            operationId: AccountService_TestAccount
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.v1.TestAccountRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.TestAccountResponse'
+    /v1/admin/dashboard:
+        get:
+            tags:
+                - AdminService
+            description: GetDashboard 获取仪表板数据
+            operationId: AdminService_GetDashboard
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.GetDashboardResponse'
+    /v1/admin/health:
+        get:
+            tags:
+                - AdminService
+            description: GetHealth 获取健康状态
+            operationId: AdminService_GetHealth
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.GetHealthResponse'
+    /v1/admin/logs:
+        get:
+            tags:
+                - AdminService
+            description: GetLogs 查询系统日志
+            operationId: AdminService_GetLogs
+            parameters:
+                - name: level
+                  in: query
+                  schema:
+                    type: integer
+                    format: enum
+                - name: service
+                  in: query
+                  schema:
+                    type: string
+                - name: traceId
+                  in: query
+                  schema:
+                    type: string
+                - name: keyword
+                  in: query
+                  schema:
+                    type: string
+                - name: startTime
+                  in: query
+                  schema:
+                    type: string
+                    format: date-time
+                - name: endTime
+                  in: query
+                  schema:
+                    type: string
+                    format: date-time
+                - name: page
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.GetLogsResponse'
+    /v1/admin/metrics:
+        get:
+            tags:
+                - AdminService
+            description: GetMetrics 获取系统指标
+            operationId: AdminService_GetMetrics
+            parameters:
+                - name: metricName
+                  in: query
+                  schema:
+                    type: string
+                - name: startTime
+                  in: query
+                  schema:
+                    type: string
+                    format: date-time
+                - name: endTime
+                  in: query
+                  schema:
+                    type: string
+                    format: date-time
+                - name: intervalSeconds
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.GetMetricsResponse'
+    /v1/admin/usage-stats:
+        get:
+            tags:
+                - AdminService
+            description: GetUsageStats 获取使用统计
+            operationId: AdminService_GetUsageStats
+            parameters:
+                - name: userId
+                  in: query
+                  schema:
+                    type: string
+                - name: accountId
+                  in: query
+                  schema:
+                    type: string
+                - name: startTime
+                  in: query
+                  schema:
+                    type: string
+                    format: date-time
+                - name: endTime
+                  in: query
+                  schema:
+                    type: string
+                    format: date-time
+                - name: groupBy
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.GetUsageStatsResponse'
+    /v1/auth/validate:
+        post:
+            tags:
+                - AuthService
+            description: ValidateAPIKey 验证API Key有效性
+            operationId: AuthService_ValidateAPIKey
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.v1.ValidateAPIKeyRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.ValidateAPIKeyResponse'
+    /v1/discount-codes/validate:
+        post:
+            tags:
+                - BillingService
+            description: ValidateDiscountCode 验证折扣码
+            operationId: BillingService_ValidateDiscountCode
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.v1.ValidateDiscountCodeRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.ValidateDiscountCodeResponse'
+    /v1/invite-codes:
+        post:
+            tags:
+                - BillingService
+            description: GenerateInviteCode 生成邀请码
+            operationId: BillingService_GenerateInviteCode
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.v1.GenerateInviteCodeRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.GenerateInviteCodeResponse'
+    /v1/keys:
+        get:
+            tags:
+                - AuthService
+            description: ListAPIKeys 查询API Key列表
+            operationId: AuthService_ListAPIKeys
+            parameters:
+                - name: userId
+                  in: query
+                  schema:
+                    type: string
+                - name: status
+                  in: query
+                  schema:
+                    type: integer
+                    format: enum
+                - name: page
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.ListAPIKeysResponse'
+        post:
+            tags:
+                - AuthService
+            description: CreateAPIKey 创建API Key
+            operationId: AuthService_CreateAPIKey
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.v1.CreateAPIKeyRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.CreateAPIKeyResponse'
+    /v1/keys/{id}:
+        get:
+            tags:
+                - AuthService
+            description: GetAPIKey 获取API Key详情
+            operationId: AuthService_GetAPIKey
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.GetAPIKeyResponse'
+        put:
+            tags:
+                - AuthService
+            description: UpdateAPIKey 更新API Key信息
+            operationId: AuthService_UpdateAPIKey
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.v1.UpdateAPIKeyRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.UpdateAPIKeyResponse'
+        delete:
+            tags:
+                - AuthService
+            description: DeleteAPIKey 删除（吊销）API Key
+            operationId: AuthService_DeleteAPIKey
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.DeleteAPIKeyResponse'
+    /v1/messages:
+        post:
+            tags:
+                - GatewayService
+            description: |-
+                CreateMessage 创建消息（支持流式响应）
+                 兼容Anthropic Messages API格式
+            operationId: GatewayService_CreateMessage
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.v1.CreateMessageRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.MessageChunk'
+    /v1/messages/count_tokens:
+        post:
+            tags:
+                - GatewayService
+            description: CountTokens 统计消息的Token数量（Beta API）
+            operationId: GatewayService_CountTokens
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.v1.CountTokensRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.CountTokensResponse'
+    /v1/models:
+        get:
+            tags:
+                - GatewayService
+            description: ListModels 获取可用模型列表
+            operationId: GatewayService_ListModels
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.ListModelsResponse'
+    /v1/orders:
+        get:
+            tags:
+                - BillingService
+            description: ListOrders 查询订单列表
+            operationId: BillingService_ListOrders
+            parameters:
+                - name: status
+                  in: query
+                  schema:
+                    type: integer
+                    format: enum
+                - name: page
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.ListOrdersResponse'
+    /v1/orders/{id}:
+        get:
+            tags:
+                - BillingService
+            description: GetOrder 获取订单详情
+            operationId: BillingService_GetOrder
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.GetOrderResponse'
+    /v1/orders/{id}/cancel:
+        post:
+            tags:
+                - BillingService
+            description: CancelOrder 取消订单
+            operationId: BillingService_CancelOrder
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.v1.CancelOrderRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.CancelOrderResponse'
+    /v1/plans:
+        get:
+            tags:
+                - PlanService
+            description: ListPlans 查询套餐列表
+            operationId: PlanService_ListPlans
+            parameters:
+                - name: status
+                  in: query
+                  schema:
+                    type: integer
+                    format: enum
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.ListPlansResponse'
+    /v1/plans/{id}:
+        get:
+            tags:
+                - PlanService
+            description: GetPlan 获取套餐详情
+            operationId: PlanService_GetPlan
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.GetPlanResponse'
+    /v1/subscriptions:
+        post:
+            tags:
+                - PlanService
+            description: Subscribe 订阅套餐
+            operationId: PlanService_Subscribe
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.v1.SubscribeRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.SubscribeResponse'
+    /v1/subscriptions/current:
+        get:
+            tags:
+                - PlanService
+            description: GetCurrentSubscription 获取当前订阅
+            operationId: PlanService_GetCurrentSubscription
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.GetCurrentSubscriptionResponse'
+        delete:
+            tags:
+                - PlanService
+            description: CancelSubscription 取消订阅
+            operationId: PlanService_CancelSubscription
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.CancelSubscriptionResponse'
+    /v1/users/api-keys:
+        post:
+            tags:
+                - UserService
+            description: CreateAPIKey 用户创建自己的API Key
+            operationId: UserService_CreateAPIKey
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.v1.CreateUserAPIKeyRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.CreateUserAPIKeyResponse'
+    /v1/users/login:
+        post:
+            tags:
+                - UserService
+            description: Login 用户登录
+            operationId: UserService_Login
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.v1.LoginRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.LoginResponse'
+    /v1/users/profile:
+        get:
+            tags:
+                - UserService
+            description: GetProfile 获取用户资料
+            operationId: UserService_GetProfile
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.GetProfileResponse'
+        put:
+            tags:
+                - UserService
+            description: UpdateProfile 更新用户资料
+            operationId: UserService_UpdateProfile
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.v1.UpdateProfileRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.UpdateProfileResponse'
+    /v1/users/register:
+        post:
+            tags:
+                - UserService
+            description: Register 用户注册
+            operationId: UserService_Register
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.v1.RegisterRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.v1.RegisterResponse'
 components:
     schemas:
+        api.v1.APIKey:
+            type: object
+            properties:
+                id:
+                    type: string
+                userId:
+                    type: string
+                tokenHash:
+                    type: string
+                name:
+                    type: string
+                rateLimit:
+                    type: integer
+                    format: int32
+                status:
+                    type: integer
+                    format: enum
+                expiresAt:
+                    type: string
+                    format: date-time
+                createdAt:
+                    type: string
+                    format: date-time
+                lastUsedAt:
+                    type: string
+                    format: date-time
+            description: APIKey API Key信息
+        api.v1.Account:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                provider:
+                    type: integer
+                    format: enum
+                apiKeyEncrypted:
+                    type: string
+                oauthDataEncrypted:
+                    type: string
+                rpmLimit:
+                    type: integer
+                    format: int32
+                tpmLimit:
+                    type: integer
+                    format: int32
+                healthScore:
+                    type: integer
+                    format: int32
+                isCircuitBroken:
+                    type: boolean
+                status:
+                    type: integer
+                    format: enum
+                metadata:
+                    type: string
+                createdAt:
+                    type: string
+                    format: date-time
+                updatedAt:
+                    type: string
+                    format: date-time
+            description: Account 账号信息
+        api.v1.CancelOrderRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                reason:
+                    type: string
+            description: CancelOrderRequest 取消订单请求
+        api.v1.CancelOrderResponse:
+            type: object
+            properties:
+                success:
+                    type: boolean
+                message:
+                    type: string
+            description: CancelOrderResponse 取消订单响应
+        api.v1.CancelSubscriptionResponse:
+            type: object
+            properties:
+                success:
+                    type: boolean
+                message:
+                    type: string
+            description: CancelSubscriptionResponse 取消订阅响应
+        api.v1.ComponentHealth:
+            type: object
+            properties:
+                name:
+                    type: string
+                status:
+                    type: integer
+                    format: enum
+                message:
+                    type: string
+                responseTimeMs:
+                    type: integer
+                    format: int32
+            description: ComponentHealth 组件健康状态
+        api.v1.ContentBlock:
+            type: object
+            properties:
+                type:
+                    type: string
+                text:
+                    type: string
+            description: ContentBlock 内容块
+        api.v1.CountTokensRequest:
+            type: object
+            properties:
+                model:
+                    type: string
+                messages:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.v1.Message'
+                system:
+                    type: string
+            description: CountTokensRequest Token计数请求
+        api.v1.CountTokensResponse:
+            type: object
+            properties:
+                inputTokens:
+                    type: integer
+                    format: int32
+            description: CountTokensResponse Token计数响应
+        api.v1.CreateAPIKeyRequest:
+            type: object
+            properties:
+                userId:
+                    type: string
+                name:
+                    type: string
+                rateLimit:
+                    type: integer
+                    format: int32
+                expiresInDays:
+                    type: string
+            description: CreateAPIKeyRequest 创建API Key请求
+        api.v1.CreateAPIKeyResponse:
+            type: object
+            properties:
+                apiKey:
+                    type: string
+                keyInfo:
+                    $ref: '#/components/schemas/api.v1.APIKey'
+            description: CreateAPIKeyResponse 创建API Key响应
+        api.v1.CreateAccountRequest:
+            type: object
+            properties:
+                name:
+                    type: string
+                provider:
+                    type: integer
+                    format: enum
+                apiKey:
+                    type: string
+                oauthData:
+                    type: string
+                rpmLimit:
+                    type: integer
+                    format: int32
+                tpmLimit:
+                    type: integer
+                    format: int32
+                metadata:
+                    type: string
+            description: CreateAccountRequest 创建账号请求
+        api.v1.CreateAccountResponse:
+            type: object
+            properties:
+                account:
+                    $ref: '#/components/schemas/api.v1.Account'
+            description: CreateAccountResponse 创建账号响应
+        api.v1.CreateMessageRequest:
+            type: object
+            properties:
+                model:
+                    type: string
+                messages:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.v1.Message'
+                maxTokens:
+                    type: integer
+                    format: int32
+                system:
+                    type: string
+                temperature:
+                    type: number
+                    format: float
+                topP:
+                    type: number
+                    format: float
+                topK:
+                    type: integer
+                    format: int32
+                stream:
+                    type: boolean
+                stopSequences:
+                    type: array
+                    items:
+                        type: string
+                metadata:
+                    type: object
+                    additionalProperties:
+                        type: string
+            description: CreateMessageRequest 创建消息请求
+        api.v1.CreateUserAPIKeyRequest:
+            type: object
+            properties:
+                name:
+                    type: string
+                rateLimit:
+                    type: integer
+                    format: int32
+                expiresInDays:
+                    type: string
+            description: CreateUserAPIKeyRequest 用户创建API Key请求
+        api.v1.CreateUserAPIKeyResponse:
+            type: object
+            properties:
+                apiKey:
+                    type: string
+                keyId:
+                    type: string
+                name:
+                    type: string
+                expiresAt:
+                    type: string
+                    format: date-time
+            description: CreateUserAPIKeyResponse 用户创建API Key响应
+        api.v1.DashboardData:
+            type: object
+            properties:
+                totalUsers:
+                    type: string
+                activeUsers:
+                    type: string
+                totalRequestsToday:
+                    type: string
+                totalRequestsMonth:
+                    type: string
+                errorRate:
+                    type: number
+                    format: double
+                activeAccounts:
+                    type: integer
+                    format: int32
+                totalAccounts:
+                    type: integer
+                    format: int32
+                totalRevenue:
+                    type: number
+                    format: double
+                monthlyRevenue:
+                    type: number
+                    format: double
+            description: DashboardData 仪表板数据
+        api.v1.DataPoint:
+            type: object
+            properties:
+                timestamp:
+                    type: string
+                    format: date-time
+                value:
+                    type: number
+                    format: double
+                labels:
+                    type: object
+                    additionalProperties:
+                        type: string
+            description: DataPoint 数据点
+        api.v1.DeleteAPIKeyResponse:
+            type: object
+            properties:
+                success:
+                    type: boolean
+                message:
+                    type: string
+            description: DeleteAPIKeyResponse 删除API Key响应
+        api.v1.DeleteAccountResponse:
+            type: object
+            properties:
+                success:
+                    type: boolean
+                message:
+                    type: string
+            description: DeleteAccountResponse 删除账号响应
+        api.v1.Delta:
+            type: object
+            properties:
+                type:
+                    type: string
+                text:
+                    type: string
+                stopReason:
+                    type: string
+                usage:
+                    $ref: '#/components/schemas/api.v1.Usage'
+            description: Delta 增量数据
+        api.v1.DiscountCode:
+            type: object
+            properties:
+                id:
+                    type: string
+                code:
+                    type: string
+                discountType:
+                    type: integer
+                    format: enum
+                discountValue:
+                    type: number
+                    format: double
+                maxUses:
+                    type: integer
+                    format: int32
+                currentUses:
+                    type: integer
+                    format: int32
+                startsAt:
+                    type: string
+                    format: date-time
+                expiresAt:
+                    type: string
+                    format: date-time
+                status:
+                    type: integer
+                    format: enum
+                createdAt:
+                    type: string
+                    format: date-time
+                updatedAt:
+                    type: string
+                    format: date-time
+            description: DiscountCode 折扣码信息
+        api.v1.GenerateInviteCodeRequest:
+            type: object
+            properties:
+                maxUses:
+                    type: integer
+                    format: int32
+                expiresInDays:
+                    type: string
+            description: GenerateInviteCodeRequest 生成邀请码请求
+        api.v1.GenerateInviteCodeResponse:
+            type: object
+            properties:
+                inviteCode:
+                    $ref: '#/components/schemas/api.v1.InviteCode'
+            description: GenerateInviteCodeResponse 生成邀请码响应
+        api.v1.GetAPIKeyResponse:
+            type: object
+            properties:
+                key:
+                    $ref: '#/components/schemas/api.v1.APIKey'
+            description: GetAPIKeyResponse 获取API Key详情响应
+        api.v1.GetAccountResponse:
+            type: object
+            properties:
+                account:
+                    $ref: '#/components/schemas/api.v1.Account'
+            description: GetAccountResponse 获取账号详情响应
+        api.v1.GetCurrentSubscriptionResponse:
+            type: object
+            properties:
+                subscription:
+                    $ref: '#/components/schemas/api.v1.Subscription'
+                quotaLimit:
+                    type: number
+                    format: double
+                quotaUsed:
+                    type: number
+                    format: double
+                quotaRemaining:
+                    type: number
+                    format: double
+            description: GetCurrentSubscriptionResponse 获取当前订阅响应
+        api.v1.GetDashboardResponse:
+            type: object
+            properties:
+                data:
+                    $ref: '#/components/schemas/api.v1.DashboardData'
+            description: GetDashboardResponse 获取仪表板响应
+        api.v1.GetHealthResponse:
+            type: object
+            properties:
+                health:
+                    $ref: '#/components/schemas/api.v1.HealthData'
+            description: GetHealthResponse 获取健康状态响应
+        api.v1.GetLogsResponse:
+            type: object
+            properties:
+                logs:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.v1.LogEntry'
+                total:
+                    type: integer
+                    format: int32
+                page:
+                    type: integer
+                    format: int32
+                pageSize:
+                    type: integer
+                    format: int32
+            description: GetLogsResponse 查询系统日志响应
+        api.v1.GetMetricsResponse:
+            type: object
+            properties:
+                metrics:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.v1.MetricsData'
+            description: GetMetricsResponse 获取系统指标响应
+        api.v1.GetOrderResponse:
+            type: object
+            properties:
+                order:
+                    $ref: '#/components/schemas/api.v1.Order'
+            description: GetOrderResponse 获取订单详情响应
+        api.v1.GetPlanResponse:
+            type: object
+            properties:
+                plan:
+                    $ref: '#/components/schemas/api.v1.Plan'
+            description: GetPlanResponse 获取套餐详情响应
+        api.v1.GetProfileResponse:
+            type: object
+            properties:
+                user:
+                    $ref: '#/components/schemas/api.v1.User'
+            description: GetProfileResponse 获取用户资料响应
+        api.v1.GetUsageStatsResponse:
+            type: object
+            properties:
+                stats:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.v1.UsageStats'
+                totalRequests:
+                    type: string
+                totalCost:
+                    type: number
+                    format: double
+            description: GetUsageStatsResponse 获取使用统计响应
+        api.v1.HealthData:
+            type: object
+            properties:
+                overallStatus:
+                    type: integer
+                    format: enum
+                components:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.v1.ComponentHealth'
+                uptimeSeconds:
+                    type: string
+                errorRate:
+                    type: number
+                    format: double
+                checkedAt:
+                    type: string
+                    format: date-time
+            description: HealthData 健康数据
+        api.v1.InviteCode:
+            type: object
+            properties:
+                id:
+                    type: string
+                code:
+                    type: string
+                createdBy:
+                    type: string
+                maxUses:
+                    type: integer
+                    format: int32
+                currentUses:
+                    type: integer
+                    format: int32
+                expiresAt:
+                    type: string
+                    format: date-time
+                status:
+                    type: integer
+                    format: enum
+                createdAt:
+                    type: string
+                    format: date-time
+                updatedAt:
+                    type: string
+                    format: date-time
+            description: InviteCode 邀请码信息
+        api.v1.ListAPIKeysResponse:
+            type: object
+            properties:
+                keys:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.v1.APIKey'
+                total:
+                    type: integer
+                    format: int32
+                page:
+                    type: integer
+                    format: int32
+                pageSize:
+                    type: integer
+                    format: int32
+            description: ListAPIKeysResponse 查询API Key列表响应
+        api.v1.ListAccountsResponse:
+            type: object
+            properties:
+                accounts:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.v1.Account'
+                total:
+                    type: integer
+                    format: int32
+                page:
+                    type: integer
+                    format: int32
+                pageSize:
+                    type: integer
+                    format: int32
+            description: ListAccountsResponse 查询账号列表响应
+        api.v1.ListModelsResponse:
+            type: object
+            properties:
+                models:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.v1.Model'
+            description: ListModelsResponse 模型列表响应
+        api.v1.ListOrdersResponse:
+            type: object
+            properties:
+                orders:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.v1.Order'
+                total:
+                    type: integer
+                    format: int32
+                page:
+                    type: integer
+                    format: int32
+                pageSize:
+                    type: integer
+                    format: int32
+            description: ListOrdersResponse 查询订单列表响应
+        api.v1.ListPlansResponse:
+            type: object
+            properties:
+                plans:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.v1.Plan'
+            description: ListPlansResponse 查询套餐列表响应
+        api.v1.LogEntry:
+            type: object
+            properties:
+                timestamp:
+                    type: string
+                    format: date-time
+                level:
+                    type: integer
+                    format: enum
+                message:
+                    type: string
+                service:
+                    type: string
+                traceId:
+                    type: string
+                fields:
+                    type: object
+                    additionalProperties:
+                        type: string
+            description: LogEntry 日志条目
+        api.v1.LoginRequest:
+            type: object
+            properties:
+                email:
+                    type: string
+                password:
+                    type: string
+            description: LoginRequest 用户登录请求
+        api.v1.LoginResponse:
+            type: object
+            properties:
+                userId:
+                    type: string
+                email:
+                    type: string
+                role:
+                    type: integer
+                    format: enum
+                token:
+                    type: string
+                expiresAt:
+                    type: string
+                    format: date-time
+            description: LoginResponse 用户登录响应
+        api.v1.Message:
+            type: object
+            properties:
+                role:
+                    type: string
+                content:
+                    type: string
+            description: Message 消息结构
+        api.v1.MessageChunk:
+            type: object
+            properties:
+                type:
+                    type: string
+                id:
+                    type: string
+                model:
+                    type: string
+                role:
+                    type: string
+                content:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.v1.ContentBlock'
+                stopReason:
+                    type: string
+                usage:
+                    $ref: '#/components/schemas/api.v1.Usage'
+                index:
+                    type: integer
+                    format: int32
+                delta:
+                    $ref: '#/components/schemas/api.v1.Delta'
+            description: MessageChunk 流式响应数据块
+        api.v1.MetricsData:
+            type: object
+            properties:
+                metricName:
+                    type: string
+                dataPoints:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.v1.DataPoint'
+            description: MetricsData 系统指标数据
+        api.v1.Model:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                description:
+                    type: string
+                maxTokens:
+                    type: integer
+                    format: int32
+                capabilities:
+                    type: array
+                    items:
+                        type: string
+            description: Model 模型信息
+        api.v1.Order:
+            type: object
+            properties:
+                id:
+                    type: string
+                orderNo:
+                    type: string
+                userId:
+                    type: string
+                planId:
+                    type: string
+                planName:
+                    type: string
+                originalAmount:
+                    type: number
+                    format: double
+                discountAmount:
+                    type: number
+                    format: double
+                finalAmount:
+                    type: number
+                    format: double
+                status:
+                    type: integer
+                    format: enum
+                paidAt:
+                    type: string
+                    format: date-time
+                startsAt:
+                    type: string
+                    format: date-time
+                expiresAt:
+                    type: string
+                    format: date-time
+                createdAt:
+                    type: string
+                    format: date-time
+                updatedAt:
+                    type: string
+                    format: date-time
+            description: Order 订单信息
+        api.v1.Plan:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                description:
+                    type: string
+                price:
+                    type: number
+                    format: double
+                dollarLimit:
+                    type: number
+                    format: double
+                durationDays:
+                    type: integer
+                    format: int32
+                rpmLimit:
+                    type: integer
+                    format: int32
+                features:
+                    type: string
+                badge:
+                    type: string
+                status:
+                    type: integer
+                    format: enum
+                createdAt:
+                    type: string
+                    format: date-time
+                updatedAt:
+                    type: string
+                    format: date-time
+            description: Plan 套餐信息
+        api.v1.RefreshTokenRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+            description: RefreshTokenRequest 刷新Token请求
+        api.v1.RefreshTokenResponse:
+            type: object
+            properties:
+                success:
+                    type: boolean
+                message:
+                    type: string
+                expiresAt:
+                    type: string
+                    format: date-time
+            description: RefreshTokenResponse 刷新Token响应
+        api.v1.RegisterRequest:
+            type: object
+            properties:
+                email:
+                    type: string
+                password:
+                    type: string
+                inviteCode:
+                    type: string
+            description: RegisterRequest 用户注册请求
+        api.v1.RegisterResponse:
+            type: object
+            properties:
+                userId:
+                    type: string
+                email:
+                    type: string
+                token:
+                    type: string
+                message:
+                    type: string
+            description: RegisterResponse 用户注册响应
+        api.v1.SubscribeRequest:
+            type: object
+            properties:
+                planId:
+                    type: string
+                discountCode:
+                    type: string
+            description: SubscribeRequest 订阅套餐请求
+        api.v1.SubscribeResponse:
+            type: object
+            properties:
+                orderId:
+                    type: string
+                subscription:
+                    $ref: '#/components/schemas/api.v1.Subscription'
+                amount:
+                    type: number
+                    format: double
+                discount:
+                    type: number
+                    format: double
+                message:
+                    type: string
+            description: SubscribeResponse 订阅套餐响应
+        api.v1.Subscription:
+            type: object
+            properties:
+                id:
+                    type: string
+                userId:
+                    type: string
+                planId:
+                    type: string
+                plan:
+                    $ref: '#/components/schemas/api.v1.Plan'
+                startsAt:
+                    type: string
+                    format: date-time
+                expiresAt:
+                    type: string
+                    format: date-time
+                status:
+                    type: integer
+                    format: enum
+                createdAt:
+                    type: string
+                    format: date-time
+            description: Subscription 订阅信息
+        api.v1.TestAccountRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+            description: TestAccountRequest 测试账号请求
+        api.v1.TestAccountResponse:
+            type: object
+            properties:
+                success:
+                    type: boolean
+                message:
+                    type: string
+                healthScore:
+                    type: integer
+                    format: int32
+                responseTimeMs:
+                    type: integer
+                    format: int32
+            description: TestAccountResponse 测试账号响应
+        api.v1.UpdateAPIKeyRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                rateLimit:
+                    type: integer
+                    format: int32
+                status:
+                    type: integer
+                    format: enum
+                expiresAt:
+                    type: string
+                    format: date-time
+            description: UpdateAPIKeyRequest 更新API Key信息请求
+        api.v1.UpdateAPIKeyResponse:
+            type: object
+            properties:
+                key:
+                    $ref: '#/components/schemas/api.v1.APIKey'
+            description: UpdateAPIKeyResponse 更新API Key信息响应
+        api.v1.UpdateAccountRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                apiKey:
+                    type: string
+                oauthData:
+                    type: string
+                rpmLimit:
+                    type: integer
+                    format: int32
+                tpmLimit:
+                    type: integer
+                    format: int32
+                status:
+                    type: integer
+                    format: enum
+                metadata:
+                    type: string
+            description: UpdateAccountRequest 更新账号信息请求
+        api.v1.UpdateAccountResponse:
+            type: object
+            properties:
+                account:
+                    $ref: '#/components/schemas/api.v1.Account'
+            description: UpdateAccountResponse 更新账号信息响应
+        api.v1.UpdateProfileRequest:
+            type: object
+            properties:
+                email:
+                    type: string
+                password:
+                    type: string
+                oldPassword:
+                    type: string
+            description: UpdateProfileRequest 更新用户资料请求
+        api.v1.UpdateProfileResponse:
+            type: object
+            properties:
+                user:
+                    $ref: '#/components/schemas/api.v1.User'
+                message:
+                    type: string
+            description: UpdateProfileResponse 更新用户资料响应
+        api.v1.Usage:
+            type: object
+            properties:
+                inputTokens:
+                    type: integer
+                    format: int32
+                outputTokens:
+                    type: integer
+                    format: int32
+                cacheCreationInputTokens:
+                    type: integer
+                    format: int32
+                cacheReadInputTokens:
+                    type: integer
+                    format: int32
+            description: Usage Token使用统计
+        api.v1.UsageStats:
+            type: object
+            properties:
+                totalRequests:
+                    type: string
+                inputTokens:
+                    type: string
+                outputTokens:
+                    type: string
+                cacheCreationTokens:
+                    type: string
+                cacheReadTokens:
+                    type: string
+                totalCost:
+                    type: number
+                    format: double
+                groupKey:
+                    type: string
+                groupValue:
+                    type: string
+            description: UsageStats 使用统计数据
+        api.v1.User:
+            type: object
+            properties:
+                id:
+                    type: string
+                email:
+                    type: string
+                passwordHash:
+                    type: string
+                role:
+                    type: integer
+                    format: enum
+                status:
+                    type: integer
+                    format: enum
+                currentPlanId:
+                    type: string
+                quotaLimit:
+                    type: number
+                    format: double
+                quotaUsed:
+                    type: number
+                    format: double
+                inviteCode:
+                    type: string
+                createdAt:
+                    type: string
+                    format: date-time
+                updatedAt:
+                    type: string
+                    format: date-time
+            description: User 用户信息
+        api.v1.ValidateAPIKeyRequest:
+            type: object
+            properties:
+                apiKey:
+                    type: string
+            description: ValidateAPIKeyRequest 验证API Key请求
+        api.v1.ValidateAPIKeyResponse:
+            type: object
+            properties:
+                valid:
+                    type: boolean
+                userId:
+                    type: string
+                rateLimit:
+                    type: integer
+                    format: int32
+                message:
+                    type: string
+            description: ValidateAPIKeyResponse 验证API Key响应
+        api.v1.ValidateDiscountCodeRequest:
+            type: object
+            properties:
+                code:
+                    type: string
+                amount:
+                    type: number
+                    format: double
+            description: ValidateDiscountCodeRequest 验证折扣码请求
+        api.v1.ValidateDiscountCodeResponse:
+            type: object
+            properties:
+                valid:
+                    type: boolean
+                discountCode:
+                    $ref: '#/components/schemas/api.v1.DiscountCode'
+                discountAmount:
+                    type: number
+                    format: double
+                finalAmount:
+                    type: number
+                    format: double
+                message:
+                    type: string
+            description: ValidateDiscountCodeResponse 验证折扣码响应
         helloworld.v1.HelloReply:
             type: object
             properties:
@@ -36,4 +1841,33 @@ components:
                     type: string
             description: The response message containing the greetings
 tags:
+    - name: AccountService
+      description: |-
+        AccountService 账号池管理服务
+         提供AI账号的CRUD操作、Token刷新和健康检测功能
+    - name: AdminService
+      description: |-
+        AdminService 管理后台服务
+         提供系统监控、统计、健康检查、日志查询功能
+    - name: AuthService
+      description: |-
+        AuthService 认证服务
+         提供API Key管理和验证功能，实现虚拟Token机制
+    - name: BillingService
+      description: |-
+        BillingService 账单管理服务
+         提供订单查询、取消、折扣码验证、邀请码生成功能
+    - name: GatewayService
+      description: |-
+        GatewayService API网关服务
+         提供统一的AI API调用接口，完全兼容Anthropic API格式
     - name: Greeter
+      description: The greeting service definition.
+    - name: PlanService
+      description: |-
+        PlanService 套餐管理服务
+         提供套餐查询、订阅、取消订阅功能
+    - name: UserService
+      description: |-
+        UserService 用户管理服务
+         提供用户注册、登录、资料管理功能

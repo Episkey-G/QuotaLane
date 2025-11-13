@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+package api.v1;
+
+option go_package = "QuotaLane/api/v1;v1";
+
+import "google/api/annotations.proto";
+import "validate/validate.proto";
+
+// GatewayService API网关服务
+// 提供统一的AI API调用接口，完全兼容Anthropic API格式
+service GatewayService {
+  // CreateMessage 创建消息（支持流式响应）
+  // 兼容Anthropic Messages API格式
+  rpc CreateMessage(CreateMessageRequest) returns (stream MessageChunk) {
+    option (google.api.http) = {
+      post: "/v1/messages"
+      body: "*"
+    };
+  }
+
+  // CountTokens 统计消息的Token数量（Beta API）
+  rpc CountTokens(CountTokensRequest) returns (CountTokensResponse) {
+    option (google.api.http) = {
+      post: "/v1/messages/count_tokens"
+      body: "*"
+    };
+  }
+
+  // ListModels 获取可用模型列表
+  rpc ListModels(ListModelsRequest) returns (ListModelsResponse) {
+    option (google.api.http) = {
+      get: "/v1/models"
+    };
+  }
+}
+
+// Message 消息结构
+message Message {
+  string role = 1 [(validate.rules).string = {in: ["user", "assistant"]}];  // 角色：user 或 assistant
+  string content = 2 [(validate.rules).string = {min_len: 1}];  // 消息内容（必填）
+}
+
+// CreateMessageRequest 创建消息请求
+message CreateMessageRequest {
+  string model = 1 [(validate.rules).string = {min_len: 1}];  // 模型名称（必填，如 claude-3-5-sonnet-20241022）
+  repeated Message messages = 2 [(validate.rules).repeated = {min_items: 1}];  // 消息列表（必填，至少1条）
+  int32 max_tokens = 3 [(validate.rules).int32 = {gt: 0, lte: 8192}];  // 最大输出tokens（必填，1-8192）
+  optional string system = 4;  // 系统提示词（可选）
+  optional float temperature = 5 [(validate.rules).float = {gte: 0.0, lte: 1.0}];  // 温度参数（可选，0.0-1.0）
+  optional float top_p = 6 [(validate.rules).float = {gte: 0.0, lte: 1.0}];  // Top-P采样（可选，0.0-1.0）
+  optional int32 top_k = 7 [(validate.rules).int32 = {gte: 0}];  // Top-K采样（可选）
+  bool stream = 8;  // 是否流式输出（默认false）
+  repeated string stop_sequences = 9;  // 停止序列（可选）
+  map<string, string> metadata = 10;  // 元数据（可选）
+}
+
+// MessageChunk 流式响应数据块
+message MessageChunk {
+  string type = 1;  // 事件类型：message_start, content_block_start, content_block_delta, content_block_stop, message_delta, message_stop
+  string id = 2;  // 消息ID
+  string model = 3;  // 使用的模型
+  string role = 4;  // 角色（assistant）
+  repeated ContentBlock content = 5;  // 内容块列表
+  string stop_reason = 6;  // 停止原因：end_turn, max_tokens, stop_sequence
+  Usage usage = 7;  // Token使用统计
+  int32 index = 8;  // 内容块索引
+  Delta delta = 9;  // 增量数据
+}
+
+// ContentBlock 内容块
+message ContentBlock {
+  string type = 1;  // 内容类型：text
+  string text = 2;  // 文本内容
+}
+
+// Delta 增量数据
+message Delta {
+  string type = 1;  // 类型：text_delta
+  string text = 2;  // 增量文本
+  string stop_reason = 3;  // 停止原因
+  Usage usage = 4;  // 使用统计增量
+}
+
+// Usage Token使用统计
+message Usage {
+  int32 input_tokens = 1;  // 输入tokens
+  int32 output_tokens = 2;  // 输出tokens
+  int32 cache_creation_input_tokens = 3;  // 缓存创建tokens
+  int32 cache_read_input_tokens = 4;  // 缓存读取tokens
+}
+
+// CreateMessageResponse 创建消息响应（非流式）
+message CreateMessageResponse {
+  string id = 1;  // 消息ID
+  string type = 2;  // 类型：message
+  string model = 3;  // 使用的模型
+  string role = 4;  // 角色（assistant）
+  repeated ContentBlock content = 5;  // 内容列表
+  string stop_reason = 6;  // 停止原因
+  Usage usage = 7;  // Token使用统计
+}
+
+// CountTokensRequest Token计数请求
+message CountTokensRequest {
+  string model = 1 [(validate.rules).string = {min_len: 1}];  // 模型名称（必填）
+  repeated Message messages = 2 [(validate.rules).repeated = {min_items: 1}];  // 消息列表（必填）
+  optional string system = 3;  // 系统提示词（可选）
+}
+
+// CountTokensResponse Token计数响应
+message CountTokensResponse {
+  int32 input_tokens = 1;  // 输入tokens总数
+}
+
+// ListModelsRequest 模型列表请求
+message ListModelsRequest {
+  // 暂无查询参数
+}
+
+// Model 模型信息
+message Model {
+  string id = 1;  // 模型ID（如 claude-3-5-sonnet-20241022）
+  string name = 2;  // 模型名称
+  string description = 3;  // 模型描述
+  int32 max_tokens = 4;  // 最大tokens
+  repeated string capabilities = 5;  // 能力列表（vision, streaming等）
+}
+
+// ListModelsResponse 模型列表响应
+message ListModelsResponse {
+  repeated Model models = 1;  // 模型列表
+}

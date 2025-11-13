@@ -1,0 +1,151 @@
+syntax = "proto3";
+
+package api.v1;
+
+option go_package = "QuotaLane/api/v1;v1";
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "validate/validate.proto";
+
+// PlanService 套餐管理服务
+// 提供套餐查询、订阅、取消订阅功能
+service PlanService {
+  // ListPlans 查询套餐列表
+  rpc ListPlans(ListPlansRequest) returns (ListPlansResponse) {
+    option (google.api.http) = {
+      get: "/v1/plans"
+    };
+  }
+
+  // GetPlan 获取套餐详情
+  rpc GetPlan(GetPlanRequest) returns (GetPlanResponse) {
+    option (google.api.http) = {
+      get: "/v1/plans/{id}"
+    };
+  }
+
+  // Subscribe 订阅套餐
+  rpc Subscribe(SubscribeRequest) returns (SubscribeResponse) {
+    option (google.api.http) = {
+      post: "/v1/subscriptions"
+      body: "*"
+    };
+  }
+
+  // GetCurrentSubscription 获取当前订阅
+  rpc GetCurrentSubscription(GetCurrentSubscriptionRequest) returns (GetCurrentSubscriptionResponse) {
+    option (google.api.http) = {
+      get: "/v1/subscriptions/current"
+    };
+  }
+
+  // CancelSubscription 取消订阅
+  rpc CancelSubscription(CancelSubscriptionRequest) returns (CancelSubscriptionResponse) {
+    option (google.api.http) = {
+      delete: "/v1/subscriptions/current"
+    };
+  }
+}
+
+// PlanStatus 套餐状态枚举
+enum PlanStatus {
+  PLAN_STATUS_UNSPECIFIED = 0;
+  PLAN_ACTIVE = 1;     // 活跃状态
+  PLAN_INACTIVE = 2;   // 已归档
+}
+
+// SubscriptionStatus 订阅状态枚举
+enum SubscriptionStatus {
+  SUBSCRIPTION_STATUS_UNSPECIFIED = 0;
+  SUBSCRIPTION_ACTIVE = 1;    // 活跃状态
+  SUBSCRIPTION_EXPIRED = 2;   // 已过期
+  SUBSCRIPTION_CANCELLED = 3; // 已取消
+}
+
+// Plan 套餐信息
+message Plan {
+  int64 id = 1;                                // 套餐ID
+  string name = 2;                             // 套餐名称
+  string description = 3;                      // 套餐描述
+  double price = 4;                            // 套餐价格（美元）
+  double dollar_limit = 5;                     // 美元额度限制
+  int32 duration_days = 6;                     // 有效期（天数）
+  int32 rpm_limit = 7;                         // 每分钟请求数限制（0表示无限制）
+  string features = 8;                         // 套餐特性（JSON格式）
+  string badge = 9;                            // 套餐徽章
+  PlanStatus status = 10;                      // 套餐状态
+  google.protobuf.Timestamp created_at = 11;   // 创建时间
+  google.protobuf.Timestamp updated_at = 12;   // 更新时间
+}
+
+// Subscription 订阅信息
+message Subscription {
+  int64 id = 1;                                     // 订阅ID
+  int64 user_id = 2;                                // 用户ID
+  int64 plan_id = 3;                                // 套餐ID
+  Plan plan = 4;                                    // 套餐详情
+  google.protobuf.Timestamp starts_at = 5;          // 开始时间
+  google.protobuf.Timestamp expires_at = 6;         // 过期时间
+  SubscriptionStatus status = 7;                    // 订阅状态
+  google.protobuf.Timestamp created_at = 8;         // 创建时间
+}
+
+// ListPlansRequest 查询套餐列表请求
+message ListPlansRequest {
+  optional PlanStatus status = 1;  // 按状态过滤（可选）
+}
+
+// ListPlansResponse 查询套餐列表响应
+message ListPlansResponse {
+  repeated Plan plans = 1;  // 套餐列表
+}
+
+// GetPlanRequest 获取套餐详情请求
+message GetPlanRequest {
+  int64 id = 1 [(validate.rules).int64 = {gt: 0}];  // 套餐ID（必填）
+}
+
+// GetPlanResponse 获取套餐详情响应
+message GetPlanResponse {
+  Plan plan = 1;  // 套餐信息
+}
+
+// SubscribeRequest 订阅套餐请求
+message SubscribeRequest {
+  int64 plan_id = 1 [(validate.rules).int64 = {gt: 0}];  // 套餐ID（必填）
+  optional string discount_code = 2 [(validate.rules).string = {max_len: 50}];  // 折扣码（可选）
+}
+
+// SubscribeResponse 订阅套餐响应
+message SubscribeResponse {
+  int64 order_id = 1;         // 订单ID
+  Subscription subscription = 2;  // 订阅信息
+  double amount = 3;          // 应付金额
+  double discount = 4;        // 折扣金额
+  string message = 5;         // 提示信息
+}
+
+// GetCurrentSubscriptionRequest 获取当前订阅请求
+message GetCurrentSubscriptionRequest {
+  // 从JWT Token中解析用户ID，无需传参
+}
+
+// GetCurrentSubscriptionResponse 获取当前订阅响应
+message GetCurrentSubscriptionResponse {
+  optional Subscription subscription = 1;  // 当前订阅（可能为空）
+  double quota_limit = 2;                  // 配额限制（美元）
+  double quota_used = 3;                   // 已使用配额（美元）
+  double quota_remaining = 4;              // 剩余配额（美元）
+}
+
+// CancelSubscriptionRequest 取消订阅请求
+message CancelSubscriptionRequest {
+  // 从JWT Token中解析用户ID，无需传参
+}
+
+// CancelSubscriptionResponse 取消订阅响应
+message CancelSubscriptionResponse {
+  bool success = 1;  // 是否成功
+  string message = 2;  // 提示信息
+}

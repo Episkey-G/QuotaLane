@@ -6,11 +6,8 @@
 package main
 
 import (
-	"QuotaLane/internal/biz"
 	"QuotaLane/internal/conf"
-	"QuotaLane/internal/data"
 	"QuotaLane/internal/server"
-	"QuotaLane/internal/service"
 
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
@@ -18,6 +15,7 @@ import (
 )
 
 // wireApp init kratos application.
+// TODO: Add data.ProviderSet, biz.ProviderSet and service.ProviderSet when implementing business logic
 func wireApp(*conf.Server, *conf.Data, log.Logger) (*kratos.App, func(), error) {
-	panic(wire.Build(server.ProviderSet, data.ProviderSet, biz.ProviderSet, service.ProviderSet, newApp))
+	panic(wire.Build(server.ProviderSet, newApp))
 }

@@ -1,0 +1,199 @@
+syntax = "proto3";
+
+package api.v1;
+
+option go_package = "QuotaLane/api/v1;v1";
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "validate/validate.proto";
+
+// AccountService 账号池管理服务
+// 提供AI账号的CRUD操作、Token刷新和健康检测功能
+service AccountService {
+  // CreateAccount 创建新账号
+  rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse) {
+    option (google.api.http) = {
+      post: "/v1/accounts"
+      body: "*"
+    };
+  }
+
+  // ListAccounts 查询账号列表
+  rpc ListAccounts(ListAccountsRequest) returns (ListAccountsResponse) {
+    option (google.api.http) = {
+      get: "/v1/accounts"
+    };
+  }
+
+  // GetAccount 获取账号详情
+  rpc GetAccount(GetAccountRequest) returns (GetAccountResponse) {
+    option (google.api.http) = {
+      get: "/v1/accounts/{id}"
+    };
+  }
+
+  // UpdateAccount 更新账号信息
+  rpc UpdateAccount(UpdateAccountRequest) returns (UpdateAccountResponse) {
+    option (google.api.http) = {
+      put: "/v1/accounts/{id}"
+      body: "*"
+    };
+  }
+
+  // DeleteAccount 删除账号
+  rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse) {
+    option (google.api.http) = {
+      delete: "/v1/accounts/{id}"
+    };
+  }
+
+  // RefreshToken 刷新OAuth Token
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse) {
+    option (google.api.http) = {
+      post: "/v1/accounts/{id}/refresh"
+      body: "*"
+    };
+  }
+
+  // TestAccount 测试账号连通性和健康度
+  rpc TestAccount(TestAccountRequest) returns (TestAccountResponse) {
+    option (google.api.http) = {
+      post: "/v1/accounts/{id}/test"
+      body: "*"
+    };
+  }
+}
+
+// AccountProvider AI服务提供商枚举
+enum AccountProvider {
+  ACCOUNT_PROVIDER_UNSPECIFIED = 0;
+  CLAUDE_OFFICIAL = 1;       // Claude官方账户
+  CLAUDE_CONSOLE = 2;        // Claude Console账户
+  BEDROCK = 3;               // AWS Bedrock
+  CCR = 4;                   // CCR账户
+  DROID = 5;                 // Droid (Factory.ai)
+  GEMINI = 6;                // Google Gemini
+  OPENAI_RESPONSES = 7;      // OpenAI Responses (Codex)
+  AZURE_OPENAI = 8;          // Azure OpenAI
+}
+
+// AccountStatus 账户状态枚举
+enum AccountStatus {
+  ACCOUNT_STATUS_UNSPECIFIED = 0;
+  ACCOUNT_ACTIVE = 1;     // 活跃状态
+  ACCOUNT_INACTIVE = 2;   // 未激活
+  ACCOUNT_ERROR = 3;      // 错误状态
+}
+
+// Account 账号信息
+message Account {
+  int64 id = 1;                                 // 账户ID
+  string name = 2;                              // 账户名称
+  AccountProvider provider = 3;                 // 服务提供商
+  string api_key_encrypted = 4;                 // 加密的API Key
+  string oauth_data_encrypted = 5;              // 加密的OAuth数据（JSON格式）
+  int32 rpm_limit = 6;                          // 每分钟请求数限制
+  int32 tpm_limit = 7;                          // 每分钟Token数限制
+  int32 health_score = 8;                       // 健康分数（0-100）
+  bool is_circuit_broken = 9;                   // 是否熔断
+  AccountStatus status = 10;                    // 账户状态
+  string metadata = 11;                         // 扩展元数据（JSON格式：代理配置、区域等）
+  google.protobuf.Timestamp created_at = 12;    // 创建时间
+  google.protobuf.Timestamp updated_at = 13;    // 更新时间
+}
+
+// CreateAccountRequest 创建账号请求
+message CreateAccountRequest {
+  string name = 1 [(validate.rules).string = {min_len: 1, max_len: 100}];  // 账户名称（必填）
+  AccountProvider provider = 2 [(validate.rules).enum = {defined_only: true, not_in: [0]}];  // 服务提供商（必填）
+  string api_key = 3;              // API Key（明文，服务端会加密存储）
+  string oauth_data = 4;           // OAuth数据（JSON格式，明文，服务端会加密存储）
+  int32 rpm_limit = 5 [(validate.rules).int32 = {gte: 0}];  // 每分钟请求数限制
+  int32 tpm_limit = 6 [(validate.rules).int32 = {gte: 0}];  // 每分钟Token数限制
+  string metadata = 7;             // 扩展元数据（JSON格式）
+}
+
+// CreateAccountResponse 创建账号响应
+message CreateAccountResponse {
+  Account account = 1;  // 创建的账号信息
+}
+
+// ListAccountsRequest 查询账号列表请求
+message ListAccountsRequest {
+  int32 page = 1 [(validate.rules).int32 = {gte: 1}];        // 页码（从1开始）
+  int32 page_size = 2 [(validate.rules).int32 = {gte: 1, lte: 100}];  // 每页数量（1-100）
+  AccountProvider provider = 3;   // 按提供商过滤（可选）
+  AccountStatus status = 4;       // 按状态过滤（可选）
+}
+
+// ListAccountsResponse 查询账号列表响应
+message ListAccountsResponse {
+  repeated Account accounts = 1;  // 账号列表
+  int32 total = 2;                // 总数量
+  int32 page = 3;                 // 当前页码
+  int32 page_size = 4;            // 每页数量
+}
+
+// GetAccountRequest 获取账号详情请求
+message GetAccountRequest {
+  int64 id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户ID（必填）
+}
+
+// GetAccountResponse 获取账号详情响应
+message GetAccountResponse {
+  Account account = 1;  // 账号信息
+}
+
+// UpdateAccountRequest 更新账号信息请求
+message UpdateAccountRequest {
+  int64 id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户ID（必填）
+  optional string name = 2 [(validate.rules).string = {max_len: 100}];  // 账户名称（可选）
+  optional string api_key = 3;           // API Key（明文，服务端会加密存储）（可选）
+  optional string oauth_data = 4;        // OAuth数据（JSON格式）（可选）
+  optional int32 rpm_limit = 5 [(validate.rules).int32 = {gte: 0}];  // RPM限制（可选）
+  optional int32 tpm_limit = 6 [(validate.rules).int32 = {gte: 0}];  // TPM限制（可选）
+  optional AccountStatus status = 7;     // 账户状态（可选）
+  optional string metadata = 8;          // 扩展元数据（JSON格式）（可选）
+}
+
+// UpdateAccountResponse 更新账号信息响应
+message UpdateAccountResponse {
+  Account account = 1;  // 更新后的账号信息
+}
+
+// DeleteAccountRequest 删除账号请求
+message DeleteAccountRequest {
+  int64 id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户ID（必填）
+}
+
+// DeleteAccountResponse 删除账号响应
+message DeleteAccountResponse {
+  bool success = 1;  // 是否成功
+  string message = 2;  // 提示信息
+}
+
+// RefreshTokenRequest 刷新Token请求
+message RefreshTokenRequest {
+  int64 id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户ID（必填）
+}
+
+// RefreshTokenResponse 刷新Token响应
+message RefreshTokenResponse {
+  bool success = 1;  // 是否成功
+  string message = 2;  // 提示信息
+  google.protobuf.Timestamp expires_at = 3;  // Token过期时间
+}
+
+// TestAccountRequest 测试账号请求
+message TestAccountRequest {
+  int64 id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户ID（必填）
+}
+
+// TestAccountResponse 测试账号响应
+message TestAccountResponse {
+  bool success = 1;           // 是否测试成功
+  string message = 2;         // 测试结果消息
+  int32 health_score = 3;     // 健康分数（0-100）
+  int32 response_time_ms = 4; // 响应时间（毫秒）
+}

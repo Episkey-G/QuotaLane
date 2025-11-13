@@ -1,0 +1,151 @@
+syntax = "proto3";
+
+package api.v1;
+
+option go_package = "QuotaLane/api/v1;v1";
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "validate/validate.proto";
+
+// UserService 用户管理服务
+// 提供用户注册、登录、资料管理功能
+service UserService {
+  // Register 用户注册
+  rpc Register(RegisterRequest) returns (RegisterResponse) {
+    option (google.api.http) = {
+      post: "/v1/users/register"
+      body: "*"
+    };
+  }
+
+  // Login 用户登录
+  rpc Login(LoginRequest) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/v1/users/login"
+      body: "*"
+    };
+  }
+
+  // GetProfile 获取用户资料
+  rpc GetProfile(GetProfileRequest) returns (GetProfileResponse) {
+    option (google.api.http) = {
+      get: "/v1/users/profile"
+    };
+  }
+
+  // UpdateProfile 更新用户资料
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse) {
+    option (google.api.http) = {
+      put: "/v1/users/profile"
+      body: "*"
+    };
+  }
+
+  // CreateAPIKey 用户创建自己的API Key
+  rpc CreateAPIKey(CreateUserAPIKeyRequest) returns (CreateUserAPIKeyResponse) {
+    option (google.api.http) = {
+      post: "/v1/users/api-keys"
+      body: "*"
+    };
+  }
+}
+
+// UserRole 用户角色枚举
+enum UserRole {
+  USER_ROLE_UNSPECIFIED = 0;
+  USER = 1;        // 普通用户
+  ADMIN = 2;       // 管理员
+  SUPER_ADMIN = 3; // 超级管理员
+}
+
+// UserStatus 用户状态枚举
+enum UserStatus {
+  USER_STATUS_UNSPECIFIED = 0;
+  USER_ACTIVE = 1;    // 活跃状态
+  USER_INACTIVE = 2;  // 未激活
+  USER_BANNED = 3;    // 已封禁
+}
+
+// User 用户信息
+message User {
+  int64 id = 1;                                    // 用户ID
+  string email = 2;                                // 用户邮箱
+  string password_hash = 3;                        // 密码哈希值（仅内部使用）
+  UserRole role = 4;                               // 用户角色
+  UserStatus status = 5;                           // 账户状态
+  optional int64 current_plan_id = 6;              // 当前套餐ID
+  double quota_limit = 7;                          // 配额限制（美元）
+  double quota_used = 8;                           // 已使用配额（美元）
+  optional string invite_code = 9;                 // 注册使用的邀请码
+  google.protobuf.Timestamp created_at = 10;       // 创建时间
+  google.protobuf.Timestamp updated_at = 11;       // 更新时间
+}
+
+// RegisterRequest 用户注册请求
+message RegisterRequest {
+  string email = 1 [(validate.rules).string = {email: true}];  // 邮箱地址（必填，格式验证）
+  string password = 2 [(validate.rules).string = {min_len: 8, max_len: 128}];  // 密码（必填，8-128字符）
+  optional string invite_code = 3 [(validate.rules).string = {max_len: 50}];  // 邀请码（可选）
+}
+
+// RegisterResponse 用户注册响应
+message RegisterResponse {
+  int64 user_id = 1;  // 用户ID
+  string email = 2;   // 邮箱地址
+  string token = 3;   // JWT Token
+  string message = 4; // 注册结果消息
+}
+
+// LoginRequest 用户登录请求
+message LoginRequest {
+  string email = 1 [(validate.rules).string = {email: true}];  // 邮箱地址（必填）
+  string password = 2 [(validate.rules).string = {min_len: 1}];  // 密码（必填）
+}
+
+// LoginResponse 用户登录响应
+message LoginResponse {
+  int64 user_id = 1;  // 用户ID
+  string email = 2;   // 邮箱地址
+  UserRole role = 3;  // 用户角色
+  string token = 4;   // JWT Token
+  google.protobuf.Timestamp expires_at = 5;  // Token过期时间
+}
+
+// GetProfileRequest 获取用户资料请求
+message GetProfileRequest {
+  // 从JWT Token中解析用户ID，无需传参
+}
+
+// GetProfileResponse 获取用户资料响应
+message GetProfileResponse {
+  User user = 1;  // 用户信息（不包含password_hash）
+}
+
+// UpdateProfileRequest 更新用户资料请求
+message UpdateProfileRequest {
+  optional string email = 1 [(validate.rules).string = {email: true}];  // 新邮箱地址（可选）
+  optional string password = 2 [(validate.rules).string = {min_len: 8, max_len: 128}];  // 新密码（可选）
+  optional string old_password = 3;  // 旧密码（修改密码时必填）
+}
+
+// UpdateProfileResponse 更新用户资料响应
+message UpdateProfileResponse {
+  User user = 1;       // 更新后的用户信息
+  string message = 2;  // 提示信息
+}
+
+// CreateUserAPIKeyRequest 用户创建API Key请求
+message CreateUserAPIKeyRequest {
+  string name = 1 [(validate.rules).string = {max_len: 100}];  // API Key名称（可选）
+  optional int32 rate_limit = 2 [(validate.rules).int32 = {gt: 0}];  // 速率限制（可选）
+  optional int64 expires_in_days = 3 [(validate.rules).int64 = {gt: 0, lte: 3650}];  // 过期天数（可选）
+}
+
+// CreateUserAPIKeyResponse 用户创建API Key响应
+message CreateUserAPIKeyResponse {
+  string api_key = 1;  // 生成的API Key（明文，仅此次返回）
+  int64 key_id = 2;    // API Key ID
+  string name = 3;     // API Key名称
+  google.protobuf.Timestamp expires_at = 4;  // 过期时间
+}

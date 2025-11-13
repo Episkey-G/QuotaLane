@@ -1,0 +1,157 @@
+syntax = "proto3";
+
+package api.v1;
+
+option go_package = "QuotaLane/api/v1;v1";
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "validate/validate.proto";
+
+// AuthService 认证服务
+// 提供API Key管理和验证功能，实现虚拟Token机制
+service AuthService {
+  // ValidateAPIKey 验证API Key有效性
+  rpc ValidateAPIKey(ValidateAPIKeyRequest) returns (ValidateAPIKeyResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/validate"
+      body: "*"
+    };
+  }
+
+  // CreateAPIKey 创建API Key
+  rpc CreateAPIKey(CreateAPIKeyRequest) returns (CreateAPIKeyResponse) {
+    option (google.api.http) = {
+      post: "/v1/keys"
+      body: "*"
+    };
+  }
+
+  // ListAPIKeys 查询API Key列表
+  rpc ListAPIKeys(ListAPIKeysRequest) returns (ListAPIKeysResponse) {
+    option (google.api.http) = {
+      get: "/v1/keys"
+    };
+  }
+
+  // GetAPIKey 获取API Key详情
+  rpc GetAPIKey(GetAPIKeyRequest) returns (GetAPIKeyResponse) {
+    option (google.api.http) = {
+      get: "/v1/keys/{id}"
+    };
+  }
+
+  // UpdateAPIKey 更新API Key信息
+  rpc UpdateAPIKey(UpdateAPIKeyRequest) returns (UpdateAPIKeyResponse) {
+    option (google.api.http) = {
+      put: "/v1/keys/{id}"
+      body: "*"
+    };
+  }
+
+  // DeleteAPIKey 删除（吊销）API Key
+  rpc DeleteAPIKey(DeleteAPIKeyRequest) returns (DeleteAPIKeyResponse) {
+    option (google.api.http) = {
+      delete: "/v1/keys/{id}"
+    };
+  }
+}
+
+// APIKeyStatus API Key状态枚举
+enum APIKeyStatus {
+  API_KEY_STATUS_UNSPECIFIED = 0;
+  API_KEY_ACTIVE = 1;    // 活跃状态
+  API_KEY_EXPIRED = 2;   // 已过期
+  API_KEY_REVOKED = 3;   // 已吊销
+}
+
+// APIKey API Key信息
+message APIKey {
+  int64 id = 1;                                  // API Key ID
+  int64 user_id = 2;                             // 用户ID
+  string token_hash = 3;                         // Token哈希值
+  string name = 4;                               // API Key名称
+  int32 rate_limit = 5;                          // 速率限制（RPM）
+  APIKeyStatus status = 6;                       // Key状态
+  google.protobuf.Timestamp expires_at = 7;      // 过期时间
+  google.protobuf.Timestamp created_at = 8;      // 创建时间
+  google.protobuf.Timestamp last_used_at = 9;    // 最后使用时间
+}
+
+// ValidateAPIKeyRequest 验证API Key请求
+message ValidateAPIKeyRequest {
+  string api_key = 1 [(validate.rules).string = {min_len: 1}];  // API Key（必填）
+}
+
+// ValidateAPIKeyResponse 验证API Key响应
+message ValidateAPIKeyResponse {
+  bool valid = 1;           // 是否有效
+  int64 user_id = 2;        // 用户ID
+  int32 rate_limit = 3;     // 速率限制
+  string message = 4;       // 验证结果消息
+}
+
+// CreateAPIKeyRequest 创建API Key请求
+message CreateAPIKeyRequest {
+  int64 user_id = 1 [(validate.rules).int64 = {gt: 0}];  // 用户ID（必填）
+  string name = 2 [(validate.rules).string = {max_len: 100}];  // API Key名称（可选）
+  optional int32 rate_limit = 3 [(validate.rules).int32 = {gt: 0}];  // 速率限制（可选，默认100）
+  optional int64 expires_in_days = 4 [(validate.rules).int64 = {gt: 0, lte: 3650}];  // 过期天数（可选，1-3650天）
+}
+
+// CreateAPIKeyResponse 创建API Key响应
+message CreateAPIKeyResponse {
+  string api_key = 1;  // 生成的API Key（明文，仅此次返回）
+  APIKey key_info = 2;  // API Key信息
+}
+
+// ListAPIKeysRequest 查询API Key列表请求
+message ListAPIKeysRequest {
+  optional int64 user_id = 1;  // 按用户ID过滤（可选）
+  optional APIKeyStatus status = 2;  // 按状态过滤（可选）
+  int32 page = 3 [(validate.rules).int32 = {gte: 1}];  // 页码（从1开始）
+  int32 page_size = 4 [(validate.rules).int32 = {gte: 1, lte: 100}];  // 每页数量（1-100）
+}
+
+// ListAPIKeysResponse 查询API Key列表响应
+message ListAPIKeysResponse {
+  repeated APIKey keys = 1;  // API Key列表
+  int32 total = 2;           // 总数量
+  int32 page = 3;            // 当前页码
+  int32 page_size = 4;       // 每页数量
+}
+
+// GetAPIKeyRequest 获取API Key详情请求
+message GetAPIKeyRequest {
+  int64 id = 1 [(validate.rules).int64 = {gt: 0}];  // API Key ID（必填）
+}
+
+// GetAPIKeyResponse 获取API Key详情响应
+message GetAPIKeyResponse {
+  APIKey key = 1;  // API Key信息
+}
+
+// UpdateAPIKeyRequest 更新API Key信息请求
+message UpdateAPIKeyRequest {
+  int64 id = 1 [(validate.rules).int64 = {gt: 0}];  // API Key ID（必填）
+  optional string name = 2 [(validate.rules).string = {max_len: 100}];  // 名称（可选）
+  optional int32 rate_limit = 3 [(validate.rules).int32 = {gt: 0}];  // 速率限制（可选）
+  optional APIKeyStatus status = 4;  // 状态（可选）
+  optional google.protobuf.Timestamp expires_at = 5;  // 过期时间（可选）
+}
+
+// UpdateAPIKeyResponse 更新API Key信息响应
+message UpdateAPIKeyResponse {
+  APIKey key = 1;  // 更新后的API Key信息
+}
+
+// DeleteAPIKeyRequest 删除API Key请求
+message DeleteAPIKeyRequest {
+  int64 id = 1 [(validate.rules).int64 = {gt: 0}];  // API Key ID（必填）
+}
+
+// DeleteAPIKeyResponse 删除API Key响应
+message DeleteAPIKeyResponse {
+  bool success = 1;  // 是否成功
+  string message = 2;  // 提示信息
+}
