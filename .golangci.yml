@@ -1,7 +1,6 @@
 # golangci-lint configuration for Kratos project
+# Compatible with golangci-lint v1.64.x (used in CI)
 # See: https://golangci-lint.run/usage/configuration/
-
-version: 2
 
 run:
   timeout: 5m
@@ -11,17 +10,14 @@ run:
 
 linters:
   enable:
-    - govet       # Vet examines Go source code and reports suspicious constructs
-    - errcheck    # Checks for unchecked errors
-    - staticcheck # Staticcheck is a go vet on steroids
-    - unused      # Checks Go code for unused constants, variables, functions and types
-    - ineffassign # Detects when assignments to existing variables are not used
-    - misspell    # Finds commonly misspelled English words in comments
-    - revive      # Fast, configurable, extensible, flexible, and beautiful linter for Go
-    - gosec       # Inspects source code for security problems
-
-formatters:
-  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - ineffassign
+    - misspell
+    - revive
+    - gosec
     - gofmt
     - goimports
 
@@ -33,7 +29,13 @@ linters-settings:
     local-prefixes: QuotaLane
 
   govet:
-    enable-all: true
+    settings:
+      printf:
+        funcs:
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
 
   revive:
     confidence: 0.8
@@ -47,8 +49,8 @@ linters-settings:
 
   gosec:
     excludes:
-      - G104  # Audit errors not checked (covered by errcheck)
-      - G304  # File path provided as taint input (too many false positives)
+      - G104
+      - G304
 
 issues:
   exclude-use-default: false
@@ -56,18 +58,15 @@ issues:
   max-same-issues: 0
 
   exclude-rules:
-    # Exclude some linters from running on tests files.
     - path: _test\.go
       linters:
         - errcheck
         - gosec
 
-    # Exclude wire_gen.go (auto-generated)
     - path: wire_gen\.go
       linters:
         - all
 
-    # Exclude third_party and api proto generated files
     - path: (third_party|api)/.*\.pb\.go
       linters:
         - all

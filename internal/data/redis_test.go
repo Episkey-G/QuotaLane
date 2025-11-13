@@ -1,10 +1,11 @@
 package data
 
 import (
-	"QuotaLane/internal/conf"
 	"context"
 	"testing"
 	"time"
+
+	"QuotaLane/internal/conf"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/go-kratos/kratos/v2/log"
