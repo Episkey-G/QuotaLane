@@ -29,7 +29,6 @@ linters-settings:
     local-prefixes: QuotaLane
 
   govet:
-    check-shadowing: true
     settings:
       printf:
         funcs:
