@@ -1,3 +1,5 @@
+// Package service provides business logic layer implementations.
+// It handles application-specific business rules and coordinates between the data layer and API layer.
 package service
 
 import "github.com/google/wire"

@@ -1,6 +1,8 @@
 # golangci-lint configuration for Kratos project
 # See: https://golangci-lint.run/usage/configuration/
 
+version: 2
+
 run:
   timeout: 5m
   modules-download-mode: readonly
@@ -9,20 +11,19 @@ run:
 
 linters:
   enable:
-    - gofmt       # Checks whether code was gofmt-ed
-    - goimports   # Check import statements are formatted
     - govet       # Vet examines Go source code and reports suspicious constructs
     - errcheck    # Checks for unchecked errors
-    - staticcheck # Staticcheck is a go vet on steroids, applying a ton of static analysis checks
+    - staticcheck # Staticcheck is a go vet on steroids
     - unused      # Checks Go code for unused constants, variables, functions and types
-    - gosimple    # Linter for Go source code that specializes in simplifying code
     - ineffassign # Detects when assignments to existing variables are not used
-    - typecheck   # Like the front-end of a Go compiler, parses and type-checks Go code
-    - goconst     # Finds repeated strings that could be replaced by a constant
     - misspell    # Finds commonly misspelled English words in comments
     - revive      # Fast, configurable, extensible, flexible, and beautiful linter for Go
-    - unconvert   # Remove unnecessary type conversions
     - gosec       # Inspects source code for security problems
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
 
 linters-settings:
   gofmt:

@@ -25,7 +25,7 @@ type Data struct {
 
 // NewData creates a new Data instance with all data layer dependencies.
 // Redis connection failure does not prevent application startup (graceful degradation).
-func NewData(c *conf.Data, logger log.Logger, rdb *redis.Client, cache CacheClient) (*Data, func(), error) {
+func NewData(_ *conf.Data, logger log.Logger, rdb *redis.Client, cache CacheClient) (*Data, func(), error) {
 	helper := log.NewHelper(logger)
 
 	// Check if Redis is available

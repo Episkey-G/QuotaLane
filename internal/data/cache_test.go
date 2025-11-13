@@ -100,7 +100,7 @@ func TestCacheGet_InvalidJSON(t *testing.T) {
 
 	// Set invalid JSON manually
 	key := "test:invalid"
-	mr.Set(key, "invalid json {{{")
+	_ = mr.Set(key, "invalid json {{{") // Intentionally set invalid data for testing
 
 	// Try to get and deserialize
 	var retrieved TestAccount
@@ -222,9 +222,9 @@ func TestCacheExists_KeyNotExists(t *testing.T) {
 func TestBuildCacheKey(t *testing.T) {
 	tests := []struct {
 		name     string
+		expected string
 		prefix   string
 		parts    []string
-		expected string
 	}{
 		{
 			name:     "account key",
@@ -410,11 +410,11 @@ func TestCacheClient_ComplexStructSerialization(t *testing.T) {
 	}
 
 	type ComplexUser struct {
-		ID        string            `json:"id"`
-		Name      string            `json:"name"`
+		CreatedAt time.Time         `json:"created_at"`
 		Addresses []Address         `json:"addresses"`
 		Metadata  map[string]string `json:"metadata"`
-		CreatedAt time.Time         `json:"created_at"`
+		ID        string            `json:"id"`
+		Name      string            `json:"name"`
 	}
 
 	original := ComplexUser{
