@@ -9,11 +9,14 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.0.4
 	github.com/go-kratos/kratos/v2 v2.8.0
 	github.com/google/wire v0.6.0
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/redis/go-redis/v9 v9.16.0
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/spf13/viper v1.18.0
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/automaxprocs v1.5.1
 	go.uber.org/zap v1.27.0
+	golang.org/x/net v0.43.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20240528184218-531527333157
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
@@ -58,7 +61,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.29.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
-	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.31.0 // indirect

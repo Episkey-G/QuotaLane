@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"QuotaLane/internal/conf"
 
@@ -11,6 +12,13 @@ import (
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
+
+// customTimeEncoder 使用北京时间 (UTC+8) 格式化时间
+func customTimeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+	// 转换为北京时间 (UTC+8)
+	beijingTime := t.In(time.FixedZone("CST", 8*3600))
+	enc.AppendString(beijingTime.Format("2006-01-02T15:04:05.000+08:00"))
+}
 
 // NewZapLogger creates a new Zap logger based on the provided configuration
 func NewZapLogger(cfg *conf.Log) (*zap.Logger, error) {
@@ -44,7 +52,7 @@ func NewZapLogger(cfg *conf.Log) (*zap.Logger, error) {
 		StacktraceKey:  "stacktrace",
 		LineEnding:     zapcore.DefaultLineEnding,
 		EncodeLevel:    zapcore.LowercaseLevelEncoder,
-		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeTime:     customTimeEncoder, // 使用北京时间 (UTC+8)
 		EncodeDuration: zapcore.SecondsDurationEncoder,
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}

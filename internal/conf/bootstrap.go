@@ -14,14 +14,14 @@ import (
 
 // NewBootstrap creates and initializes a Bootstrap configuration.
 // It loads configuration from the specified config file path, applies defaults,
-// and allows overrides from environment variables prefixed with CLAUDDY_.
+// and allows overrides from environment variables prefixed with QUOTALANE_.
 //
 // Configuration priority: CLI flags > Environment variables > Config file > Defaults
 //
 // Required environment variables:
-//   - MYSQL_DSN or CLAUDDY_DATA_DATABASE_SOURCE: MySQL connection string
-//   - JWT_SECRET or CLAUDDY_AUTH_JWT_SECRET: JWT signing secret
-//   - ENCRYPTION_KEY or CLAUDDY_AUTH_ENCRYPTION_KEY: Data encryption key
+//   - MYSQL_DSN or QUOTALANE_DATA_DATABASE_SOURCE: MySQL connection string
+//   - JWT_SECRET or QUOTALANE_AUTH_JWT_SECRET: JWT signing secret
+//   - ENCRYPTION_KEY or QUOTALANE_AUTH_ENCRYPTION_KEY: Data encryption key
 //
 // Parameters:
 //   - configPath: Path to the configuration file or directory
@@ -35,16 +35,17 @@ func NewBootstrap(configPath string) (*Bootstrap, error) {
 	// Set default values
 	setDefaults(v)
 
-	// Enable environment variable support with CLAUDDY_ prefix
-	v.SetEnvPrefix("CLAUDDY")
+	// Enable environment variable support with QUOTALANE_ prefix
+	v.SetEnvPrefix("QUOTALANE")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
-	// Allow direct environment variable names (without CLAUDDY_ prefix) for compatibility
+	// Allow direct environment variable names (without QUOTALANE_ prefix) for compatibility
 	// Bind specific environment variables for required fields
-	_ = v.BindEnv("data.database.source", "MYSQL_DSN", "CLAUDDY_DATA_DATABASE_SOURCE")
-	_ = v.BindEnv("auth.jwt.secret", "JWT_SECRET", "CLAUDDY_AUTH_JWT_SECRET")
-	_ = v.BindEnv("auth.encryption.key", "ENCRYPTION_KEY", "CLAUDDY_AUTH_ENCRYPTION_KEY")
+	_ = v.BindEnv("data.database.source", "MYSQL_DSN", "QUOTALANE_DATA_DATABASE_SOURCE")
+	_ = v.BindEnv("data.redis.addr", "QUOTALANE_DATA_REDIS_ADDR")
+	_ = v.BindEnv("auth.jwt.secret", "JWT_SECRET", "QUOTALANE_AUTH_JWT_SECRET")
+	_ = v.BindEnv("auth.encryption.key", "ENCRYPTION_KEY", "QUOTALANE_AUTH_ENCRYPTION_KEY")
 
 	// Load configuration file
 	if configPath != "" {

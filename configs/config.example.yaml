@@ -27,7 +27,7 @@ data:
     # Database driver (default: mysql)
     driver: mysql
     # Database connection string (REQUIRED - must be provided via environment variable)
-    # Set via: MYSQL_DSN or CLAUDDY_DATA_DATABASE_SOURCE environment variable
+    # Set via: MYSQL_DSN or QUOTALANE_DATA_DATABASE_SOURCE environment variable
     # Example: "user:password@tcp(localhost:3306)/quotalane?charset=utf8mb4&parseTime=True&loc=Local"
     source: ${MYSQL_DSN}
 
@@ -47,7 +47,7 @@ auth:
   # JWT Configuration
   jwt:
     # JWT signing secret (REQUIRED - must be provided via environment variable)
-    # Set via: JWT_SECRET or CLAUDDY_AUTH_JWT_SECRET environment variable
+    # Set via: JWT_SECRET or QUOTALANE_AUTH_JWT_SECRET environment variable
     # Should be a strong random string (minimum 32 characters recommended)
     secret: ${JWT_SECRET}
     # JWT token expiration time (default: 24h)
@@ -56,7 +56,7 @@ auth:
   # Encryption Configuration
   encryption:
     # Encryption key for sensitive data (REQUIRED - must be provided via environment variable)
-    # Set via: ENCRYPTION_KEY or CLAUDDY_AUTH_ENCRYPTION_KEY environment variable
+    # Set via: ENCRYPTION_KEY or QUOTALANE_AUTH_ENCRYPTION_KEY environment variable
     # Must be exactly 32 characters for AES-256 encryption
     key: ${ENCRYPTION_KEY}
 
@@ -69,12 +69,12 @@ log:
 
 # Environment Variable Usage:
 # ---------------------------
-# All configuration values can be overridden using environment variables with CLAUDDY_ prefix.
+# All configuration values can be overridden using environment variables with QUOTALANE_ prefix.
 #
 # Examples:
-#   CLAUDDY_SERVER_HTTP_ADDR=:8888
-#   CLAUDDY_DATA_REDIS_ADDR=redis.example.com:6379
-#   CLAUDDY_LOG_LEVEL=debug
+#   QUOTALANE_SERVER_HTTP_ADDR=:8888
+#   QUOTALANE_DATA_REDIS_ADDR=redis.example.com:6379
+#   QUOTALANE_LOG_LEVEL=debug
 #
 # Required Environment Variables:
 #   MYSQL_DSN                       - Database connection string
