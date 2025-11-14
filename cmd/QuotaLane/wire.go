@@ -14,21 +14,30 @@ import (
 	"QuotaLane/internal/server"
 	"QuotaLane/internal/service"
 	"QuotaLane/pkg/crypto"
+	"QuotaLane/pkg/oauth"
 
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/wire"
 )
 
+// AppComponents holds the application and its dependencies.
+type AppComponents struct {
+	App       *kratos.App
+	AccountUC *biz.AccountUsecase
+}
+
 // wireApp init kratos application.
-func wireApp(*conf.Server, *conf.Data, *conf.Auth, log.Logger) (*kratos.App, func(), error) {
+func wireApp(*conf.Server, *conf.Data, *conf.Auth, log.Logger) (*AppComponents, func(), error) {
 	panic(wire.Build(
 		data.ProviderSet,
 		biz.ProviderSet,
 		service.ProviderSet,
 		server.ProviderSet,
+		oauth.ProviderSet,
 		newCryptoService,
 		newApp,
+		wire.Struct(new(AppComponents), "*"),
 	))
 }
 

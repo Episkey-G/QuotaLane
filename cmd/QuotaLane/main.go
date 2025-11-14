@@ -3,9 +3,11 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 
+	"QuotaLane/internal/biz"
 	"QuotaLane/internal/conf"
 	zapLogger "QuotaLane/pkg/log"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/tracing"
 	"github.com/go-kratos/kratos/v2/transport/grpc"
 	"github.com/go-kratos/kratos/v2/transport/http"
+	"github.com/robfig/cron/v3"
 
 	_ "go.uber.org/automaxprocs"
 )
@@ -84,18 +87,57 @@ func main() {
 		"msg", "QuotaLane service starting",
 		"log.level", bc.Log.Level,
 		"log.format", bc.Log.Format,
-		"log.env", bc.Log.Env,
-		"log.output_file", bc.Log.OutputFile,
 	)
 
-	app, cleanup, err := wireApp(bc.Server, bc.Data, bc.Auth, logger)
+	appComponents, cleanup, err := wireApp(bc.Server, bc.Data, bc.Auth, logger)
 	if err != nil {
 		panic(err)
 	}
 	defer cleanup()
 
+	// Initialize and start cron scheduler for OAuth token refresh
+	cronScheduler := setupCronJobs(appComponents.AccountUC, logger)
+	cronScheduler.Start()
+	defer cronScheduler.Stop()
+
+	log.NewHelper(logger).Info("Cron scheduler started for OAuth token refresh")
+
 	// start and wait for stop signal
-	if err := app.Run(); err != nil {
+	if err := appComponents.App.Run(); err != nil {
 		panic(err)
 	}
+}
+
+// setupCronJobs configures and returns the cron scheduler.
+// The scheduler runs AutoRefreshTokens every 5 minutes.
+func setupCronJobs(accountUC *biz.AccountUsecase, logger log.Logger) *cron.Cron {
+	helper := log.NewHelper(logger)
+
+	// Create cron scheduler with default configuration
+	c := cron.New()
+
+	// Add OAuth token refresh job (every 5 minutes)
+	// Cron format: "*/5 * * * *" = at minute 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
+	_, err := c.AddFunc("*/5 * * * *", func() {
+		defer func() {
+			if r := recover(); r != nil {
+				helper.Errorf("panic in OAuth token refresh cron job: %v", r)
+			}
+		}()
+
+		ctx := context.Background()
+		helper.Info("Starting OAuth token refresh cron job")
+
+		if err := accountUC.AutoRefreshTokens(ctx); err != nil {
+			helper.Errorf("OAuth token refresh cron job failed: %v", err)
+		} else {
+			helper.Info("OAuth token refresh cron job completed successfully")
+		}
+	})
+
+	if err != nil {
+		helper.Fatalf("failed to add OAuth refresh cron job: %v", err)
+	}
+
+	return c
 }

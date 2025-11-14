@@ -20,11 +20,16 @@ services:
       - "9000:9000"  # gRPC 端口
       - "9090:9090"  # Prometheus metrics 端口（Story 7.1）
     environment:
+      # 时区配置
+      TZ: Asia/Shanghai
       # 数据库配置
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: root
       DB_NAME: quotalane
+      MYSQL_DSN: root:root@tcp(mysql:3306)/quotalane?charset=utf8mb4&parseTime=True&loc=Local
+      # Redis 配置
+      QUOTALANE_DATA_REDIS_ADDR: redis:6379
       # 应用环境
       QUOTALANE_ENV: ${QUOTALANE_ENV:-development}
     env_file:
@@ -61,6 +66,7 @@ services:
     ports:
       - "3306:3306"
     environment:
+      TZ: Asia/Shanghai
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: quotalane
       MYSQL_CHARSET: utf8mb4
@@ -88,6 +94,8 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
+    environment:
+      TZ: Asia/Shanghai
     volumes:
       # 数据持久化
       - quotalane-redis-data:/data
@@ -106,9 +114,13 @@ services:
     restart: unless-stopped
     ports:
       - "9091:9090"  # Prometheus UI 端口（映射到 9091 避免与应用 metrics 端口冲突）
+    environment:
+      TZ: Asia/Shanghai
     volumes:
       - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - quotalane-prometheus-data:/prometheus
+      # 挂载时区文件（Prometheus 镜像需要）
+      - /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime:ro
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -124,6 +136,7 @@ services:
     ports:
       - "3000:3000"  # Grafana Web UI
     environment:
+      TZ: Asia/Shanghai
       GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
       GF_SERVER_ROOT_URL: http://localhost:3000
       GF_USERS_ALLOW_SIGN_UP: false

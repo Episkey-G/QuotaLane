@@ -77,41 +77,41 @@ func TestNewBootstrap_EnvOverrides(t *testing.T) {
 		{
 			name: "override_http_addr",
 			envVars: map[string]string{
-				"CLAUDDY_SERVER_HTTP_ADDR": ":9999",
-				"MYSQL_DSN":                "user:pass@tcp(localhost:3306)/testdb",
-				"JWT_SECRET":               "test-jwt-secret",
-				"ENCRYPTION_KEY":           "test-encryption-key-1234",
+				"QUOTALANE_SERVER_HTTP_ADDR": ":9999",
+				"MYSQL_DSN":                  "user:pass@tcp(localhost:3306)/testdb",
+				"JWT_SECRET":                 "test-jwt-secret",
+				"ENCRYPTION_KEY":             "test-encryption-key-1234",
 			},
 			expectedVal: func(bc *Bootstrap) bool {
 				return bc.Server.Http.Addr == ":9999"
 			},
-			description: "CLAUDDY_SERVER_HTTP_ADDR should override default :8080",
+			description: "QUOTALANE_SERVER_HTTP_ADDR should override default :8080",
 		},
 		{
 			name: "override_redis_addr",
 			envVars: map[string]string{
-				"CLAUDDY_DATA_REDIS_ADDR": "redis.example.com:6379",
-				"MYSQL_DSN":               "user:pass@tcp(localhost:3306)/testdb",
-				"JWT_SECRET":              "test-jwt-secret",
-				"ENCRYPTION_KEY":          "test-encryption-key-1234",
+				"QUOTALANE_DATA_REDIS_ADDR": "redis.example.com:6379",
+				"MYSQL_DSN":                 "user:pass@tcp(localhost:3306)/testdb",
+				"JWT_SECRET":                "test-jwt-secret",
+				"ENCRYPTION_KEY":            "test-encryption-key-1234",
 			},
 			expectedVal: func(bc *Bootstrap) bool {
 				return bc.Data.Redis.Addr == "redis.example.com:6379"
 			},
-			description: "CLAUDDY_DATA_REDIS_ADDR should override default",
+			description: "QUOTALANE_DATA_REDIS_ADDR should override default",
 		},
 		{
 			name: "override_log_level",
 			envVars: map[string]string{
-				"CLAUDDY_LOG_LEVEL": "debug",
-				"MYSQL_DSN":         "user:pass@tcp(localhost:3306)/testdb",
-				"JWT_SECRET":        "test-jwt-secret",
-				"ENCRYPTION_KEY":    "test-encryption-key-1234",
+				"QUOTALANE_LOG_LEVEL": "debug",
+				"MYSQL_DSN":           "user:pass@tcp(localhost:3306)/testdb",
+				"JWT_SECRET":          "test-jwt-secret",
+				"ENCRYPTION_KEY":      "test-encryption-key-1234",
 			},
 			expectedVal: func(bc *Bootstrap) bool {
 				return bc.Log.Level == "debug"
 			},
-			description: "CLAUDDY_LOG_LEVEL should override default info",
+			description: "QUOTALANE_LOG_LEVEL should override default info",
 		},
 	}
 
@@ -199,11 +199,11 @@ func TestNewBootstrap_MissingRequired(t *testing.T) {
 
 			// Clear all relevant environment variables first to ensure isolation
 			os.Unsetenv("MYSQL_DSN")
-			os.Unsetenv("CLAUDDY_DATA_DATABASE_SOURCE")
+			os.Unsetenv("QUOTALANE_DATA_DATABASE_SOURCE")
 			os.Unsetenv("JWT_SECRET")
-			os.Unsetenv("CLAUDDY_AUTH_JWT_SECRET")
+			os.Unsetenv("QUOTALANE_AUTH_JWT_SECRET")
 			os.Unsetenv("ENCRYPTION_KEY")
-			os.Unsetenv("CLAUDDY_AUTH_ENCRYPTION_KEY")
+			os.Unsetenv("QUOTALANE_AUTH_ENCRYPTION_KEY")
 
 			// Set only the environment variables specified for this test
 			for k, v := range tt.envVars {
@@ -270,7 +270,7 @@ data:
 	require.NoError(t, err)
 
 	// Set environment variable that should override file value
-	t.Setenv("CLAUDDY_SERVER_HTTP_ADDR", ":8888")
+	t.Setenv("QUOTALANE_SERVER_HTTP_ADDR", ":8888")
 	t.Setenv("MYSQL_DSN", "user:pass@tcp(localhost:3306)/testdb")
 	t.Setenv("JWT_SECRET", "test-jwt-secret")
 	t.Setenv("ENCRYPTION_KEY", "test-encryption-key")

@@ -98,12 +98,39 @@ func (s *AccountService) DeleteAccount(ctx context.Context, req *v1.DeleteAccoun
 	}, nil
 }
 
-// RefreshToken refreshes OAuth token for an account (Not implemented in this story).
+// RefreshToken refreshes OAuth token for an account.
+// This RPC manually triggers token refresh for a specific Claude account.
+// Only admin users can call this endpoint (permission check should be done in middleware).
 func (s *AccountService) RefreshToken(ctx context.Context, req *v1.RefreshTokenRequest) (*v1.RefreshTokenResponse, error) {
-	s.logger.Warnw("RefreshToken not implemented in Story 2.1", "id", req.Id)
+	s.logger.Infow("RefreshToken called", "account_id", req.Id)
+
+	// TODO: Add admin permission check here (JWT middleware should validate role = admin)
+	// This will be implemented in Story 4.2 (JWT Auth Middleware)
+
+	// Call business logic to refresh token
+	if err := s.uc.RefreshClaudeToken(ctx, req.Id); err != nil {
+		s.logger.Errorw("failed to refresh token", "account_id", req.Id, "error", err)
+		return &v1.RefreshTokenResponse{
+			Success: false,
+			Message: err.Error(),
+		}, err
+	}
+
+	// Fetch updated account to get new expires_at
+	account, err := s.uc.GetAccount(ctx, req.Id)
+	if err != nil {
+		s.logger.Warnw("failed to get updated account after refresh", "account_id", req.Id, "error", err)
+		// Still return success since refresh succeeded
+		return &v1.RefreshTokenResponse{
+			Success: true,
+			Message: "Token refreshed successfully",
+		}, nil
+	}
+
 	return &v1.RefreshTokenResponse{
-		Success: false,
-		Message: "RefreshToken feature will be implemented in Story 2.2",
+		Success:   true,
+		Message:   "Token refreshed successfully",
+		ExpiresAt: account.OauthExpiresAt, // 返回真实的 OAuth Token 过期时间
 	}, nil
 }
 

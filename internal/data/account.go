@@ -48,14 +48,15 @@ type Account struct {
 	Provider           AccountProvider `gorm:"column:provider;type:enum('claude-official','claude-console','bedrock','ccr','droid','gemini','openai-responses','azure-openai');not null"`
 	APIKeyEncrypted    string          `gorm:"column:api_key_encrypted;type:text"`
 	OAuthDataEncrypted string          `gorm:"column:oauth_data_encrypted;type:text"`
+	OAuthExpiresAt     *time.Time      `gorm:"column:oauth_expires_at"` // OAuth Token 过期时间（可为 NULL）
 	RpmLimit           int32           `gorm:"column:rpm_limit;default:0;not null"`
 	TpmLimit           int32           `gorm:"column:tpm_limit;default:0;not null"`
 	HealthScore        int32           `gorm:"column:health_score;default:100;not null"`
 	IsCircuitBroken    bool            `gorm:"column:is_circuit_broken;default:false;not null"`
 	Status             AccountStatus   `gorm:"column:status;type:enum('active','inactive','error');default:'active';not null"`
 	Metadata           string          `gorm:"column:metadata;type:json"` // JSON string
-	CreatedAt          time.Time       `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP"`
-	UpdatedAt          time.Time       `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP"`
+	CreatedAt          time.Time       `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt          time.Time       `gorm:"column:updated_at;autoUpdateTime"`
 }
 
 // TableName specifies the table name for GORM.
@@ -185,7 +186,7 @@ func StatusFromProto(s v1.AccountStatus) AccountStatus {
 
 // ToProto converts GORM Account model to Proto Account message.
 func (a *Account) ToProto() *v1.Account {
-	return &v1.Account{
+	proto := &v1.Account{
 		Id:                 a.ID,
 		Name:               a.Name,
 		Provider:           ProviderToProto(a.Provider),
@@ -200,6 +201,13 @@ func (a *Account) ToProto() *v1.Account {
 		CreatedAt:          timestamppb.New(a.CreatedAt),
 		UpdatedAt:          timestamppb.New(a.UpdatedAt),
 	}
+
+	// OAuthExpiresAt 可为空，只有在非 nil 时才转换
+	if a.OAuthExpiresAt != nil {
+		proto.OauthExpiresAt = timestamppb.New(*a.OAuthExpiresAt)
+	}
+
+	return proto
 }
 
 // MaskSensitiveData masks sensitive fields in Account for display.
@@ -226,6 +234,10 @@ type AccountRepo interface {
 	ListAccounts(ctx context.Context, filter *AccountFilter) ([]*Account, int32, error)
 	UpdateAccount(ctx context.Context, account *Account) error
 	DeleteAccount(ctx context.Context, id int64) error
+	ListExpiringAccounts(ctx context.Context, expiryThreshold time.Time) ([]*Account, error)
+	UpdateOAuthData(ctx context.Context, accountID int64, oauthData string, expiresAt time.Time) error
+	UpdateHealthScore(ctx context.Context, accountID int64, score int32) error
+	UpdateAccountStatus(ctx context.Context, accountID int64, status AccountStatus) error
 }
 
 // AccountFilter defines query filter for listing accounts.
@@ -424,5 +436,135 @@ func ValidateMetadataJSON(metadata string) error {
 	if err := json.Unmarshal([]byte(metadata), &js); err != nil {
 		return fmt.Errorf("invalid JSON metadata: %w", err)
 	}
+	return nil
+}
+
+// ListExpiringAccounts 查询即将过期的 Claude 账户
+// expiryThreshold: 过期时间阈值（如 time.Now().Add(10 * time.Minute)）
+// 返回 oauth_expires_at <= expiryThreshold 的 active 状态 Claude 账户
+func (r *accountRepo) ListExpiringAccounts(ctx context.Context, expiryThreshold time.Time) ([]*Account, error) {
+	var accounts []*Account
+
+	// SQL: WHERE provider IN ('claude-official', 'claude-console')
+	//      AND status = 'active'
+	//      AND oauth_expires_at IS NOT NULL
+	//      AND oauth_expires_at <= ?
+	//      ORDER BY oauth_expires_at ASC
+	err := r.db.WithContext(ctx).
+		Where("provider IN (?, ?)", ProviderClaudeOfficial, ProviderClaudeConsole).
+		Where("status = ?", StatusActive).
+		Where("oauth_expires_at IS NOT NULL").
+		Where("oauth_expires_at <= ?", expiryThreshold).
+		Order("oauth_expires_at ASC").
+		Find(&accounts).Error
+
+	if err != nil {
+		r.logger.Errorf("failed to list expiring accounts: %v", err)
+		return nil, fmt.Errorf("failed to list expiring accounts: %w", err)
+	}
+
+	r.logger.Infow("expiring accounts listed", "count", len(accounts), "threshold", expiryThreshold)
+	return accounts, nil
+}
+
+// UpdateOAuthData 更新账户的 OAuth 数据和过期时间
+// accountID: 账户 ID
+// oauthData: 加密后的 OAuth 数据（Base64 编码）
+// expiresAt: OAuth Token 过期时间
+func (r *accountRepo) UpdateOAuthData(ctx context.Context, accountID int64, oauthData string, expiresAt time.Time) error {
+	updates := map[string]interface{}{
+		"oauth_data_encrypted": oauthData,
+		"oauth_expires_at":     expiresAt,
+		"updated_at":           time.Now(),
+	}
+
+	result := r.db.WithContext(ctx).
+		Model(&Account{}).
+		Where("id = ?", accountID).
+		Updates(updates)
+
+	if result.Error != nil {
+		r.logger.Errorf("failed to update OAuth data: %v", result.Error)
+		return fmt.Errorf("failed to update OAuth data: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("account not found: id=%d", accountID)
+	}
+
+	// Clear cache
+	cacheKey := fmt.Sprintf("account:%d", accountID)
+	if err := r.cache.Delete(ctx, cacheKey); err != nil {
+		r.logger.Warnw("failed to delete account cache after OAuth update", "id", accountID, "error", err)
+	}
+
+	r.logger.Infow("OAuth data updated", "account_id", accountID, "expires_at", expiresAt)
+	return nil
+}
+
+// UpdateHealthScore 更新账户的健康分数
+// accountID: 账户 ID
+// score: 新的健康分数（0-100）
+// 使用 GREATEST(0, LEAST(100, ?)) 确保分数在 [0, 100] 范围内
+func (r *accountRepo) UpdateHealthScore(ctx context.Context, accountID int64, score int32) error {
+	// SQL: UPDATE api_accounts
+	//      SET health_score = GREATEST(0, LEAST(100, ?)),
+	//          updated_at = NOW()
+	//      WHERE id = ?
+	result := r.db.WithContext(ctx).
+		Model(&Account{}).
+		Where("id = ?", accountID).
+		Updates(map[string]interface{}{
+			"health_score": gorm.Expr("GREATEST(0, LEAST(100, ?))", score),
+			"updated_at":   time.Now(),
+		})
+
+	if result.Error != nil {
+		r.logger.Errorf("failed to update health score: %v", result.Error)
+		return fmt.Errorf("failed to update health score: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("account not found: id=%d", accountID)
+	}
+
+	// Clear cache
+	cacheKey := fmt.Sprintf("account:%d", accountID)
+	if err := r.cache.Delete(ctx, cacheKey); err != nil {
+		r.logger.Warnw("failed to delete account cache after health score update", "id", accountID, "error", err)
+	}
+
+	r.logger.Infow("health score updated", "account_id", accountID, "score", score)
+	return nil
+}
+
+// UpdateAccountStatus 更新账户状态
+// accountID: 账户 ID
+// status: 新状态（active/inactive/error）
+func (r *accountRepo) UpdateAccountStatus(ctx context.Context, accountID int64, status AccountStatus) error {
+	result := r.db.WithContext(ctx).
+		Model(&Account{}).
+		Where("id = ?", accountID).
+		Updates(map[string]interface{}{
+			"status":     status,
+			"updated_at": time.Now(),
+		})
+
+	if result.Error != nil {
+		r.logger.Errorf("failed to update account status: %v", result.Error)
+		return fmt.Errorf("failed to update account status: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("account not found: id=%d", accountID)
+	}
+
+	// Clear cache
+	cacheKey := fmt.Sprintf("account:%d", accountID)
+	if err := r.cache.Delete(ctx, cacheKey); err != nil {
+		r.logger.Warnw("failed to delete account cache after status update", "id", accountID, "error", err)
+	}
+
+	r.logger.Infow("account status updated", "account_id", accountID, "status", status)
 	return nil
 }

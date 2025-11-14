@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	v1 "QuotaLane/api/v1"
 	"QuotaLane/internal/data"
 	"QuotaLane/pkg/crypto"
+	"QuotaLane/pkg/oauth"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -50,6 +53,29 @@ func (m *MockAccountRepo) DeleteAccount(ctx context.Context, id int64) error {
 	return args.Error(0)
 }
 
+func (m *MockAccountRepo) ListExpiringAccounts(ctx context.Context, expiryThreshold time.Time) ([]*data.Account, error) {
+	args := m.Called(ctx, expiryThreshold)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*data.Account), args.Error(1)
+}
+
+func (m *MockAccountRepo) UpdateOAuthData(ctx context.Context, accountID int64, encryptedData string, expiresAt time.Time) error {
+	args := m.Called(ctx, accountID, encryptedData, expiresAt)
+	return args.Error(0)
+}
+
+func (m *MockAccountRepo) UpdateHealthScore(ctx context.Context, accountID int64, score int32) error {
+	args := m.Called(ctx, accountID, score)
+	return args.Error(0)
+}
+
+func (m *MockAccountRepo) UpdateAccountStatus(ctx context.Context, accountID int64, status data.AccountStatus) error {
+	args := m.Called(ctx, accountID, status)
+	return args.Error(0)
+}
+
 // setupTestUsecase creates a test AccountUsecase with mock dependencies.
 func setupTestUsecase(t *testing.T) (*AccountUsecase, *MockAccountRepo, *crypto.AESCrypto) {
 	mockRepo := new(MockAccountRepo)
@@ -60,7 +86,13 @@ func setupTestUsecase(t *testing.T) (*AccountUsecase, *MockAccountRepo, *crypto.
 	cryptoSvc, err := crypto.NewAESCrypto(testKey)
 	assert.NoError(t, err)
 
-	uc := NewAccountUsecase(mockRepo, cryptoSvc, logger)
+	// Create mock OAuth service (nil for unit tests)
+	var oauthSvc oauth.OAuthService = nil
+
+	// Create mock Redis client (nil for unit tests)
+	var rdb *redis.Client = nil
+
+	uc := NewAccountUsecase(mockRepo, cryptoSvc, oauthSvc, rdb, logger)
 	return uc, mockRepo, cryptoSvc
 }
 

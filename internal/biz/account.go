@@ -7,22 +7,28 @@ import (
 	v1 "QuotaLane/api/v1"
 	"QuotaLane/internal/data"
 	"QuotaLane/pkg/crypto"
+	"QuotaLane/pkg/oauth"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/redis/go-redis/v9"
 )
 
 // AccountUsecase implements account business logic.
 type AccountUsecase struct {
 	repo   data.AccountRepo
 	crypto *crypto.AESCrypto
+	oauth  oauth.OAuthService
+	rdb    *redis.Client
 	logger *log.Helper
 }
 
 // NewAccountUsecase creates a new account usecase.
-func NewAccountUsecase(repo data.AccountRepo, crypto *crypto.AESCrypto, logger log.Logger) *AccountUsecase {
+func NewAccountUsecase(repo data.AccountRepo, crypto *crypto.AESCrypto, oauth oauth.OAuthService, rdb *redis.Client, logger log.Logger) *AccountUsecase {
 	return &AccountUsecase{
 		repo:   repo,
 		crypto: crypto,
+		oauth:  oauth,
+		rdb:    rdb,
 		logger: log.NewHelper(logger),
 	}
 }

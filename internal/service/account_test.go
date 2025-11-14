@@ -10,8 +10,10 @@ import (
 	"QuotaLane/internal/biz"
 	"QuotaLane/internal/data"
 	"QuotaLane/pkg/crypto"
+	"QuotaLane/pkg/oauth"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -52,9 +54,46 @@ func (m *MockAccountRepo) DeleteAccount(ctx context.Context, id int64) error {
 	return args.Error(0)
 }
 
+func (m *MockAccountRepo) ListExpiringAccounts(ctx context.Context, expiryThreshold time.Time) ([]*data.Account, error) {
+	args := m.Called(ctx, expiryThreshold)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*data.Account), args.Error(1)
+}
+
+func (m *MockAccountRepo) UpdateOAuthData(ctx context.Context, accountID int64, oauthData string, expiresAt time.Time) error {
+	args := m.Called(ctx, accountID, oauthData, expiresAt)
+	return args.Error(0)
+}
+
+func (m *MockAccountRepo) UpdateHealthScore(ctx context.Context, accountID int64, score int32) error {
+	args := m.Called(ctx, accountID, score)
+	return args.Error(0)
+}
+
+func (m *MockAccountRepo) UpdateAccountStatus(ctx context.Context, accountID int64, status data.AccountStatus) error {
+	args := m.Called(ctx, accountID, status)
+	return args.Error(0)
+}
+
+// MockOAuthService is a mock implementation of oauth.OAuthService for testing.
+type MockOAuthService struct {
+	mock.Mock
+}
+
+func (m *MockOAuthService) RefreshToken(ctx context.Context, refreshToken, proxyURL string) (*oauth.TokenResponse, error) {
+	args := m.Called(ctx, refreshToken, proxyURL)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*oauth.TokenResponse), args.Error(1)
+}
+
 // setupTestService creates a test AccountService with mock repository.
 func setupTestService(t *testing.T) (*AccountService, *MockAccountRepo) {
 	mockRepo := new(MockAccountRepo)
+	mockOAuth := new(MockOAuthService)
 	logger := log.DefaultLogger
 
 	// Create AES crypto with test key
@@ -62,8 +101,12 @@ func setupTestService(t *testing.T) (*AccountService, *MockAccountRepo) {
 	cryptoSvc, err := crypto.NewAESCrypto(testKey)
 	assert.NoError(t, err)
 
-	// Create real usecase with mock repo
-	uc := biz.NewAccountUsecase(mockRepo, cryptoSvc, logger)
+	// Create test Redis client (use nil for unit tests, or miniredis for integration tests)
+	// For unit tests, we don't actually need a real Redis connection
+	var rdb *redis.Client = nil
+
+	// Create real usecase with mock dependencies
+	uc := biz.NewAccountUsecase(mockRepo, cryptoSvc, mockOAuth, rdb, logger)
 
 	// Create service with real usecase
 	svc := NewAccountService(uc, logger)
@@ -308,22 +351,37 @@ func TestDeleteAccount_Error(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
-// TestRefreshToken tests RefreshToken placeholder.
+// TestRefreshToken tests RefreshToken RPC.
+// This test expects failure because we're using nil Redis client in setupTestService.
+// Full refresh logic is tested in integration tests (internal/biz/account_refresh_integration_test.go).
 func TestRefreshToken(t *testing.T) {
-	svc, _ := setupTestService(t)
+	svc, mockRepo := setupTestService(t)
 	ctx := context.Background()
 
 	req := &v1.RefreshTokenRequest{
 		Id: 1,
 	}
 
+	// Mock GetAccount call (will fail early due to nil Redis)
+	mockRepo.On("GetAccount", ctx, int64(1)).Return(&data.Account{
+		ID:                 1,
+		Name:               "Test Account",
+		Provider:           data.ProviderClaudeConsole,
+		OAuthDataEncrypted: "encrypted_oauth_data",
+		HealthScore:        100,
+		Status:             data.StatusActive,
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
+	}, nil)
+
 	resp, err := svc.RefreshToken(ctx, req)
 
-	// Should return success=false with message about future implementation
-	assert.NoError(t, err)
+	// Should fail because Redis client is nil (expected in unit tests)
+	// Real refresh logic is tested in integration tests
+	assert.Error(t, err)
 	assert.NotNil(t, resp)
 	assert.False(t, resp.Success)
-	assert.Contains(t, resp.Message, "Story 2.2")
+	mockRepo.AssertExpectations(t)
 }
 
 // TestTestAccount tests TestAccount placeholder.
