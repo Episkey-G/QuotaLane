@@ -1,7 +1,6 @@
 package data
 
 import (
-	"QuotaLane/internal/conf"
 	"fmt"
 	"time"
 
@@ -9,6 +8,8 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"QuotaLane/internal/conf"
 )
 
 // NewMySQLClient creates a new GORM MySQL client.
