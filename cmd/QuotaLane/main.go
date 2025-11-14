@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"QuotaLane/internal/conf"
+	zapLogger "QuotaLane/pkg/log"
 
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
@@ -49,9 +50,28 @@ func newApp(logger log.Logger, gs *grpc.Server, hs *http.Server) *kratos.App {
 
 func main() {
 	flag.Parse()
-	logger := log.With(log.NewStdLogger(os.Stdout),
-		"ts", log.DefaultTimestamp,
-		"caller", log.DefaultCaller,
+
+	// Load configuration using Viper with environment variable and CLI flag support
+	bc, err := conf.NewBootstrap(flagconf)
+	if err != nil {
+		// Use fallback logger before Zap is initialized
+		log.Fatalf("failed to load configuration: %v", err)
+	}
+
+	// Initialize Zap logger from configuration
+	zapLog, err := zapLogger.NewZapLogger(bc.Log)
+	if err != nil {
+		log.Fatalf("failed to initialize zap logger: %v", err)
+	}
+	defer func() {
+		_ = zapLog.Sync() // Ignore sync errors on shutdown
+	}()
+
+	// Create Kratos adapter for Zap logger
+	logger := zapLogger.NewKratosAdapter(zapLog)
+
+	// Add context fields to logger
+	logger = log.With(logger,
 		"service.id", id,
 		"service.name", Name,
 		"service.version", Version,
@@ -59,11 +79,14 @@ func main() {
 		"span.id", tracing.SpanID(),
 	)
 
-	// Load configuration using Viper with environment variable and CLI flag support
-	bc, err := conf.NewBootstrap(flagconf)
-	if err != nil {
-		log.Fatalf("failed to load configuration: %v", err)
-	}
+	// Log startup configuration
+	log.NewHelper(logger).Infow(
+		"msg", "QuotaLane service starting",
+		"log.level", bc.Log.Level,
+		"log.format", bc.Log.Format,
+		"log.env", bc.Log.Env,
+		"log.output_file", bc.Log.OutputFile,
+	)
 
 	app, cleanup, err := wireApp(bc.Server, bc.Data, logger)
 	if err != nil {

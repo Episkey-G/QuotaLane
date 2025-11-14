@@ -57,4 +57,6 @@ message Auth {
 message Log {
   string level = 1;
   string format = 2;
+  string output_file = 3;
+  string env = 4;
 }

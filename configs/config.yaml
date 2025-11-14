@@ -28,3 +28,7 @@ auth:
 log:
   level: info
   format: json
+  # Optional: log file path for file output with rotation (empty = no file output)
+  output_file: ""
+  # Optional: environment (production/development), defaults to QUOTALANE_ENV env var
+  env: ""

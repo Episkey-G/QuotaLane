@@ -6,6 +6,54 @@
 #   日志: docker-compose logs -f
 
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GOPROXY: https://goproxy.cn
+    image: quotalane:latest
+    container_name: quotalane-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"  # HTTP 端口
+      - "9000:9000"  # gRPC 端口
+      - "9090:9090"  # Prometheus metrics 端口（Story 7.1）
+    environment:
+      # 数据库配置
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_NAME: quotalane
+      # 应用环境
+      QUOTALANE_ENV: ${QUOTALANE_ENV:-development}
+    env_file:
+      - .env
+    volumes:
+      # 配置文件挂载（只读）
+      - ./configs:/data/conf:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # 启动时自动检查并初始化数据库（幂等：已初始化则跳过）
+    command: >
+      sh -c "
+        /app/scripts/init-db.sh &&
+        /app/QuotaLane -conf /data/conf/config.yaml
+      "
+    # 健康检查（临时方案：TCP 检查，Story 7.3 后使用 HTTP /health 端点）
+    # healthcheck:
+    #   test: ["CMD", "nc", "-z", "localhost", "8000"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 40s
+    # 注意：当前使用简化方案（不配置 healthcheck），等待 Story 7.3 实现 /health 端点后启用
+    networks:
+      - quotalane-network
+
   mysql:
     image: mysql:8.0
     container_name: quotalane-mysql
@@ -52,11 +100,51 @@ services:
     networks:
       - quotalane-network
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: quotalane-prometheus
+    restart: unless-stopped
+    ports:
+      - "9091:9090"  # Prometheus UI 端口（映射到 9091 避免与应用 metrics 端口冲突）
+    volumes:
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - quotalane-prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - quotalane-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: quotalane-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"  # Grafana Web UI
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
+      GF_SERVER_ROOT_URL: http://localhost:3000
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - quotalane-grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    # 注意：数据源（Prometheus）和 Dashboard 配置在 Story 7.2 实现
+    # 当前可手动添加数据源：http://prometheus:9090
+    networks:
+      - quotalane-network
+
 volumes:
   quotalane-mysql-data:
     name: quotalane-mysql-data
   quotalane-redis-data:
     name: quotalane-redis-data
+  quotalane-prometheus-data:
+    name: quotalane-prometheus-data
+  quotalane-grafana-data:
+    name: quotalane-grafana-data
 
 networks:
   quotalane-network:
