@@ -9,7 +9,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: episkey-g/quotalane
 
 jobs:
   lint:
@@ -215,6 +214,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Convert repository name to lowercase
+        id: repo_lowercase
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "image_name=${REPO_LOWER}" >> $GITHUB_OUTPUT
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -229,7 +234,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ steps.repo_lowercase.outputs.image_name }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -251,8 +256,8 @@ jobs:
 
       - name: Test Docker image
         run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          if docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest --version 2>&1 | grep -q "QuotaLane\|version\|Usage"; then
+          docker pull ${{ env.REGISTRY }}/${{ steps.repo_lowercase.outputs.image_name }}:latest
+          if docker run --rm ${{ env.REGISTRY }}/${{ steps.repo_lowercase.outputs.image_name }}:latest --version 2>&1 | grep -q "QuotaLane\|version\|Usage"; then
             echo "Docker image test passed"
           else
             echo "Warning: Docker image version check did not return expected output"
