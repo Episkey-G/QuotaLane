@@ -19,6 +19,7 @@ import (
 
 const (
 	// ClaudeOAuthTokenURL Claude OAuth Token 端点
+	//nolint:gosec // G101: 这是一个公开的 API 端点 URL，不是凭据
 	ClaudeOAuthTokenURL = "https://api.claude.ai/v1/oauth/token"
 
 	// DefaultTimeout 默认超时时间
@@ -58,6 +59,7 @@ type RefreshTokenRequest struct {
 }
 
 // OAuthService OAuth 服务接口
+//nolint:revive // 保持 OAuthService 命名以明确表示这是 OAuth 服务
 type OAuthService interface {
 	RefreshToken(ctx context.Context, refreshToken, proxyURL string) (*TokenResponse, error)
 }
@@ -146,7 +148,7 @@ func (s *oauthService) RefreshToken(ctx context.Context, refreshToken, proxyURL 
 
 		// 读取响应
 		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close() // 忽略 Close 错误，因为已经读取了 body
 		if err != nil {
 			lastErr = fmt.Errorf("attempt %d: failed to read response: %w", attempt+1, err)
 			continue
