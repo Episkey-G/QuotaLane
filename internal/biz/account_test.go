@@ -77,12 +77,12 @@ func TestCreateAccount_Success(t *testing.T) {
 		{
 			name: "CLAUDE_CONSOLE with OAuth",
 			req: &v1.CreateAccountRequest{
-				Name:       "Test Claude Console",
-				Provider:   v1.AccountProvider_CLAUDE_CONSOLE,
-				OauthData:  `{"access_token":"test_token","refresh_token":"test_refresh"}`,
-				RpmLimit:   50,
-				TpmLimit:   100000,
-				Metadata:   `{"region":"us-east-1"}`,
+				Name:      "Test Claude Console",
+				Provider:  v1.AccountProvider_CLAUDE_CONSOLE,
+				OauthData: `{"access_token":"test_token","refresh_token":"test_refresh"}`,
+				RpmLimit:  50,
+				TpmLimit:  100000,
+				Metadata:  `{"region":"us-east-1"}`,
 			},
 			provider: v1.AccountProvider_CLAUDE_CONSOLE,
 		},
