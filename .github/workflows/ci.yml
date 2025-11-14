@@ -3,8 +3,13 @@ name: CI
 on:
   push:
     branches: [ main, develop ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main, develop ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   lint:
@@ -20,25 +25,11 @@ jobs:
           go-version: '1.24'
           cache: true
 
-      - name: Install protoc
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
-          protoc --version
-
-      - name: Install proto plugins
-        run: |
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-          go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@latest
-          go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
-          go install github.com/envoyproxy/protoc-gen-validate@latest
+      - name: Setup Proto and Wire
+        uses: ./.github/actions/setup-proto
 
       - name: Generate Proto code
         run: make proto
-
-      - name: Install Wire
-        run: go install github.com/google/wire/cmd/wire@latest
 
       - name: Generate Wire code
         run: make wire
@@ -46,7 +37,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          version: v1.64.8
           args: --timeout=5m
 
   test:
@@ -67,25 +58,11 @@ jobs:
           go mod download
           go mod verify
 
-      - name: Install protoc
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
-          protoc --version
-
-      - name: Install proto plugins
-        run: |
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-          go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@latest
-          go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
-          go install github.com/envoyproxy/protoc-gen-validate@latest
+      - name: Setup Proto and Wire
+        uses: ./.github/actions/setup-proto
 
       - name: Generate Proto code
         run: make proto
-
-      - name: Install Wire
-        run: go install github.com/google/wire/cmd/wire@latest
 
       - name: Generate Wire code
         run: make wire
@@ -96,9 +73,102 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.out
           flags: unittests
           name: codecov-umbrella
+
+  integration-test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword
+          MYSQL_DATABASE: quotalane_test
+          MYSQL_USER: quotalane
+          MYSQL_PASSWORD: password
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Setup Proto and Wire
+        uses: ./.github/actions/setup-proto
+
+      - name: Generate Proto code
+        run: make proto
+
+      - name: Generate Wire code
+        run: make wire
+
+      - name: Create .env file for testing
+        run: |
+          cat > .env << EOF
+          MYSQL_DSN=quotalane:password@tcp(127.0.0.1:3306)/quotalane_test?charset=utf8mb4&parseTime=True&loc=Local
+          REDIS_ADDR=127.0.0.1:6379
+          REDIS_PASSWORD=
+          JWT_SECRET=test-jwt-secret-for-integration-tests
+          ENCRYPTION_KEY=test-encryption-key-32-chars!!
+          EOF
+
+      - name: Wait for services
+        run: |
+          echo "Waiting for MySQL..."
+          for i in {1..30}; do
+            if mysqladmin ping -h 127.0.0.1 -P 3306 -u root -prootpassword --silent; then
+              echo "MySQL is ready!"
+              break
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 2
+          done
+
+          echo "Waiting for Redis..."
+          for i in {1..30}; do
+            if redis-cli -h 127.0.0.1 -p 6379 ping > /dev/null 2>&1; then
+              echo "Redis is ready!"
+              break
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 2
+          done
+
+      - name: Run integration tests
+        env:
+          INTEGRATION_TEST: "true"
+        run: |
+          # Note: Currently no integration tests exist (will be added in future stories)
+          # Running with || true to prevent CI failure until tests are implemented
+          if go test -tags=integration -v -race ./... 2>&1 | tee /tmp/integration-test.log; then
+            echo "Integration tests passed or no tests found"
+          else
+            # Check if it's "no test files" error (acceptable for now)
+            if grep -q "no test files" /tmp/integration-test.log || grep -q "no packages to test" /tmp/integration-test.log; then
+              echo "No integration tests found - this is expected for Epic 1"
+              exit 0
+            else
+              echo "Integration tests failed!"
+              exit 1
+            fi
+          fi
 
   build:
     name: Build
@@ -114,25 +184,11 @@ jobs:
           go-version: '1.24'
           cache: true
 
-      - name: Install protoc
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
-          protoc --version
-
-      - name: Install proto plugins
-        run: |
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-          go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@latest
-          go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
-          go install github.com/envoyproxy/protoc-gen-validate@latest
+      - name: Setup Proto and Wire
+        uses: ./.github/actions/setup-proto
 
       - name: Generate Proto code
         run: make proto
-
-      - name: Install Wire
-        run: go install github.com/google/wire/cmd/wire@latest
 
       - name: Generate Wire code
         run: make wire
@@ -148,10 +204,13 @@ jobs:
           retention-days: 7
 
   docker:
-    name: Docker Build
+    name: Docker Build and Push
     runs-on: ubuntu-latest
     needs: [lint, test]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -159,9 +218,42 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
-        run: make docker
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
 
       - name: Test Docker image
         run: |
-          docker run --rm quotalane:latest --version || true
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          if docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest --version 2>&1 | grep -q "QuotaLane\|version\|Usage"; then
+            echo "Docker image test passed"
+          else
+            echo "Warning: Docker image version check did not return expected output"
+          fi

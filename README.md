@@ -3,6 +3,8 @@
 [![Go Version](https://img.shields.io/badge/Go-1.24-blue.svg)](https://golang.org)
 [![Kratos](https://img.shields.io/badge/Kratos-v2.8.0-green.svg)](https://go-kratos.dev)
 [![Build Status](https://github.com/Episkey-G/QuotaLane/workflows/CI/badge.svg)](https://github.com/Episkey-G/QuotaLane/actions)
+[![codecov](https://codecov.io/gh/Episkey-G/QuotaLane/branch/main/graph/badge.svg)](https://codecov.io/gh/Episkey-G/QuotaLane)
+[![Docker Image](https://ghcr-badge.egpl.dev/episkey-g/quotalane/latest_tag?trim=major&label=docker)](https://github.com/Episkey-G/QuotaLane/pkgs/container/quotalane)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 > **QuotaLane** - 高性能 AI API 中转服务的 Go 重构版本

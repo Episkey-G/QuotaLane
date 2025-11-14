@@ -1,0 +1,32 @@
+name: 'Setup Protocol Buffers'
+description: 'Install protoc and Go plugins for code generation'
+runs:
+  using: "composite"
+  steps:
+    - name: Install protoc
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y protobuf-compiler
+        protoc --version
+
+    - name: Cache proto plugins
+      uses: actions/cache@v4
+      with:
+        path: ~/go/bin
+        key: ${{ runner.os }}-proto-plugins-${{ hashFiles('**/go.mod') }}
+        restore-keys: |
+          ${{ runner.os }}-proto-plugins-
+
+    - name: Install proto plugins
+      shell: bash
+      run: |
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+        go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@latest
+        go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
+        go install github.com/envoyproxy/protoc-gen-validate@latest
+
+    - name: Install Wire
+      shell: bash
+      run: go install github.com/google/wire/cmd/wire@latest
