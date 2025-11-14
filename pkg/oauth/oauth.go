@@ -59,6 +59,7 @@ type RefreshTokenRequest struct {
 }
 
 // OAuthService OAuth 服务接口
+//
 //nolint:revive // 保持 OAuthService 命名以明确表示这是 OAuth 服务
 type OAuthService interface {
 	RefreshToken(ctx context.Context, refreshToken, proxyURL string) (*TokenResponse, error)
