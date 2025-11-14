@@ -6,6 +6,8 @@
 package main
 
 import (
+	"fmt"
+
 	"QuotaLane/internal/biz"
 	"QuotaLane/internal/conf"
 	"QuotaLane/internal/data"
@@ -33,7 +35,10 @@ func wireApp(*conf.Server, *conf.Data, *conf.Auth, log.Logger) (*kratos.App, fun
 // newCryptoService creates AES crypto service from config.
 func newCryptoService(auth *conf.Auth) (*crypto.AESCrypto, error) {
 	if auth == nil || auth.Encryption == nil {
-		return nil, nil // Gracefully handle missing config
+		return nil, fmt.Errorf("encryption configuration is required but not found in auth config")
+	}
+	if len(auth.Encryption.Key) != 32 {
+		return nil, fmt.Errorf("encryption key must be exactly 32 bytes, got %d bytes", len(auth.Encryption.Key))
 	}
 	return crypto.NewAESCrypto([]byte(auth.Encryption.Key))
 }
