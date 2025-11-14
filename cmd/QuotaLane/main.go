@@ -63,7 +63,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to initialize zap logger: %v", err)
 	}
-	defer zapLog.Sync()
+	defer func() {
+		_ = zapLog.Sync() // Ignore sync errors on shutdown
+	}()
 
 	// Create Kratos adapter for Zap logger
 	logger := zapLogger.NewKratosAdapter(zapLog)

@@ -1,3 +1,5 @@
+// Package log provides logging utilities for QuotaLane service.
+// It includes a Zap logger wrapper with Kratos adapter and automatic field sanitization.
 package log
 
 import (
