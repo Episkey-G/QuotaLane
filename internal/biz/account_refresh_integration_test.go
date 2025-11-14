@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package biz
@@ -167,16 +168,16 @@ func TestRefreshClaudeToken_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	account := &data.Account{
-		Name:                "Test Claude Account",
-		Provider:            data.ProviderClaudeOfficial,
-		Status:              data.StatusActive,
-		HealthScore:         80, // Will be reset to 100 on success
-		OAuthDataEncrypted:  encryptedOAuth,
-		OAuthExpiresAt:      &expiresAt,
-		RpmLimit:            50,
-		TpmLimit:            200000,
-		IsCircuitBroken:     false,
-		Metadata:            "{}",
+		Name:               "Test Claude Account",
+		Provider:           data.ProviderClaudeOfficial,
+		Status:             data.StatusActive,
+		HealthScore:        80, // Will be reset to 100 on success
+		OAuthDataEncrypted: encryptedOAuth,
+		OAuthExpiresAt:     &expiresAt,
+		RpmLimit:           50,
+		TpmLimit:           200000,
+		IsCircuitBroken:    false,
+		Metadata:           "{}",
 	}
 
 	err = suite.accountRepo.CreateAccount(ctx, account)

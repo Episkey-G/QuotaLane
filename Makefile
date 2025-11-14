@@ -81,10 +81,24 @@ wire:
 test:
 	go test -v -race -cover -coverprofile=coverage.out ./...
 
+.PHONY: fmt
+# format code with gofmt
+fmt:
+	@echo "Formatting Go code..."
+	@gofmt -w .
+	@echo "Code formatted successfully"
+
 .PHONY: lint
 # run golangci-lint
 lint:
 	golangci-lint run --timeout=5m
+
+.PHONY: check
+# run format and lint checks before commit
+check: fmt
+	@echo "Running lint checks..."
+	@make lint
+	@echo "All checks passed!"
 
 .PHONY: docker
 # build docker image
