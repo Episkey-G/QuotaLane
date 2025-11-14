@@ -101,6 +101,7 @@ message Account {
   string metadata = 11;                         // 扩展元数据（JSON格式：代理配置、区域等）
   google.protobuf.Timestamp created_at = 12;    // 创建时间
   google.protobuf.Timestamp updated_at = 13;    // 更新时间
+  google.protobuf.Timestamp oauth_expires_at = 14;  // OAuth Token 过期时间（可为空）
 }
 
 // CreateAccountRequest 创建账号请求

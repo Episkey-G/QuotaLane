@@ -130,7 +130,7 @@ func (s *AccountService) RefreshToken(ctx context.Context, req *v1.RefreshTokenR
 	return &v1.RefreshTokenResponse{
 		Success:   true,
 		Message:   "Token refreshed successfully",
-		ExpiresAt: account.UpdatedAt, // Note: Using UpdatedAt as a proxy since oauth_expires_at is not in proto yet
+		ExpiresAt: account.OauthExpiresAt, // 返回真实的 OAuth Token 过期时间
 	}, nil
 }
 

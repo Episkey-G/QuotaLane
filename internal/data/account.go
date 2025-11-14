@@ -186,7 +186,7 @@ func StatusFromProto(s v1.AccountStatus) AccountStatus {
 
 // ToProto converts GORM Account model to Proto Account message.
 func (a *Account) ToProto() *v1.Account {
-	return &v1.Account{
+	proto := &v1.Account{
 		Id:                 a.ID,
 		Name:               a.Name,
 		Provider:           ProviderToProto(a.Provider),
@@ -201,6 +201,13 @@ func (a *Account) ToProto() *v1.Account {
 		CreatedAt:          timestamppb.New(a.CreatedAt),
 		UpdatedAt:          timestamppb.New(a.UpdatedAt),
 	}
+
+	// OAuthExpiresAt 可为空，只有在非 nil 时才转换
+	if a.OAuthExpiresAt != nil {
+		proto.OauthExpiresAt = timestamppb.New(*a.OAuthExpiresAt)
+	}
+
+	return proto
 }
 
 // MaskSensitiveData masks sensitive fields in Account for display.
