@@ -79,7 +79,7 @@ wire:
 .PHONY: test
 # run unit tests and integration tests
 test:
-	go test -v -race -cover ./...
+	go test -v -race -cover -coverprofile=coverage.out ./...
 
 .PHONY: lint
 # run golangci-lint
