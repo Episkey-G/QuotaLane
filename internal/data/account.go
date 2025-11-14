@@ -19,6 +19,7 @@ import (
 // AccountProvider represents the database ENUM type for provider.
 type AccountProvider string
 
+// Account provider constants representing different AI service providers.
 const (
 	ProviderClaudeOfficial  AccountProvider = "claude-official"
 	ProviderClaudeConsole   AccountProvider = "claude-console"
@@ -33,6 +34,7 @@ const (
 // AccountStatus represents the database ENUM type for status.
 type AccountStatus string
 
+// Account status constants representing the current state of an account.
 const (
 	StatusActive   AccountStatus = "active"
 	StatusInactive AccountStatus = "inactive"
@@ -44,7 +46,7 @@ type Account struct {
 	ID                 int64           `gorm:"primaryKey;column:id"`
 	Name               string          `gorm:"column:name;size:100;not null"`
 	Provider           AccountProvider `gorm:"column:provider;type:enum('claude-official','claude-console','bedrock','ccr','droid','gemini','openai-responses','azure-openai');not null"`
-	ApiKeyEncrypted    string          `gorm:"column:api_key_encrypted;type:text"`
+	APIKeyEncrypted    string          `gorm:"column:api_key_encrypted;type:text"`
 	OAuthDataEncrypted string          `gorm:"column:oauth_data_encrypted;type:text"`
 	RpmLimit           int32           `gorm:"column:rpm_limit;default:0;not null"`
 	TpmLimit           int32           `gorm:"column:tpm_limit;default:0;not null"`
@@ -187,7 +189,7 @@ func (a *Account) ToProto() *v1.Account {
 		Id:                 a.ID,
 		Name:               a.Name,
 		Provider:           ProviderToProto(a.Provider),
-		ApiKeyEncrypted:    a.ApiKeyEncrypted,
+		ApiKeyEncrypted:    a.APIKeyEncrypted,
 		OauthDataEncrypted: a.OAuthDataEncrypted,
 		RpmLimit:           a.RpmLimit,
 		TpmLimit:           a.TpmLimit,
@@ -205,10 +207,10 @@ func (a *Account) ToProto() *v1.Account {
 // OAuth Data: replace with "[ENCRYPTED]"
 func (a *Account) MaskSensitiveData() {
 	// Mask API Key
-	if a.ApiKeyEncrypted != "" && len(a.ApiKeyEncrypted) > 8 {
-		prefix := a.ApiKeyEncrypted[:4]
-		suffix := a.ApiKeyEncrypted[len(a.ApiKeyEncrypted)-4:]
-		a.ApiKeyEncrypted = prefix + "****" + suffix
+	if a.APIKeyEncrypted != "" && len(a.APIKeyEncrypted) > 8 {
+		prefix := a.APIKeyEncrypted[:4]
+		suffix := a.APIKeyEncrypted[len(a.APIKeyEncrypted)-4:]
+		a.APIKeyEncrypted = prefix + "****" + suffix
 	}
 
 	// Mask OAuth Data
@@ -344,7 +346,12 @@ func (r *accountRepo) ListAccounts(ctx context.Context, filter *AccountFilter) (
 	}
 
 	r.logger.Debugw("accounts listed", "count", len(accounts), "total", total, "page", filter.Page)
-	return accounts, int32(total), nil
+
+	// Safe conversion of int64 to int32 with overflow check
+	if total > 2147483647 { // max int32
+		return accounts, 2147483647, nil
+	}
+	return accounts, int32(total), nil // #nosec G115 -- safe conversion with overflow check
 }
 
 // UpdateAccount updates an account and clears its cache.
@@ -395,8 +402,8 @@ func (r *accountRepo) DeleteAccount(ctx context.Context, id int64) error {
 	return nil
 }
 
-// MaskApiKey masks API key for display (show first 4 + last 4 characters).
-func MaskApiKey(apiKey string) string {
+// MaskAPIKey masks API key for display (show first 4 + last 4 characters).
+func MaskAPIKey(apiKey string) string {
 	if apiKey == "" {
 		return ""
 	}

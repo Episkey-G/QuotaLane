@@ -1,3 +1,5 @@
+// Package crypto provides cryptographic utilities for QuotaLane.
+// It includes AES-256-GCM encryption/decryption functions for securing sensitive data.
 package crypto
 
 import (

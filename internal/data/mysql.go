@@ -51,10 +51,10 @@ func NewMySQLClient(c *conf.Data, l log.Logger) (*gorm.DB, func(), error) {
 	}
 
 	// Configure connection pool
-	sqlDB.SetMaxIdleConns(10)                   // Max idle connections
-	sqlDB.SetMaxOpenConns(100)                  // Max open connections
-	sqlDB.SetConnMaxLifetime(time.Hour)         // Connection max lifetime
-	sqlDB.SetConnMaxIdleTime(10 * time.Minute)  // Idle connection max lifetime
+	sqlDB.SetMaxIdleConns(10)                  // Max idle connections
+	sqlDB.SetMaxOpenConns(100)                 // Max open connections
+	sqlDB.SetConnMaxLifetime(time.Hour)        // Connection max lifetime
+	sqlDB.SetConnMaxIdleTime(10 * time.Minute) // Idle connection max lifetime
 
 	// Test connection
 	if err := sqlDB.Ping(); err != nil {

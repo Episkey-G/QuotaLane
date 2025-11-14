@@ -13,9 +13,9 @@ import (
 
 // AccountUsecase implements account business logic.
 type AccountUsecase struct {
-	repo      data.AccountRepo
-	crypto    *crypto.AESCrypto
-	logger    *log.Helper
+	repo   data.AccountRepo
+	crypto *crypto.AESCrypto
+	logger *log.Helper
 }
 
 // NewAccountUsecase creates a new account usecase.
@@ -62,7 +62,7 @@ func (uc *AccountUsecase) CreateAccount(ctx context.Context, req *v1.CreateAccou
 			uc.logger.Errorf("failed to encrypt API key: %v", err)
 			return nil, fmt.Errorf("failed to encrypt credentials")
 		}
-		account.ApiKeyEncrypted = encrypted
+		account.APIKeyEncrypted = encrypted
 	}
 
 	// Encrypt OAuth Data if provided (for CLAUDE_CONSOLE)
@@ -180,7 +180,7 @@ func (uc *AccountUsecase) UpdateAccount(ctx context.Context, req *v1.UpdateAccou
 			uc.logger.Errorf("failed to encrypt API key: %v", err)
 			return nil, fmt.Errorf("failed to encrypt credentials")
 		}
-		account.ApiKeyEncrypted = encrypted
+		account.APIKeyEncrypted = encrypted
 	}
 
 	// Update OAuth Data if provided
@@ -233,7 +233,7 @@ func (uc *AccountUsecase) isSupportedProvider(provider v1.AccountProvider) bool 
 func (uc *AccountUsecase) maskSensitiveFields(account *v1.Account) {
 	// Mask API Key: show first 4 + last 4 characters
 	if account.ApiKeyEncrypted != "" && len(account.ApiKeyEncrypted) > 8 {
-		account.ApiKeyEncrypted = data.MaskApiKey(account.ApiKeyEncrypted)
+		account.ApiKeyEncrypted = data.MaskAPIKey(account.ApiKeyEncrypted)
 	}
 
 	// Mask OAuth Data: replace with placeholder

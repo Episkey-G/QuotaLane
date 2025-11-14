@@ -111,9 +111,9 @@ func (s *AccountService) RefreshToken(ctx context.Context, req *v1.RefreshTokenR
 func (s *AccountService) TestAccount(ctx context.Context, req *v1.TestAccountRequest) (*v1.TestAccountResponse, error) {
 	s.logger.Warnw("TestAccount not implemented in Story 2.1", "id", req.Id)
 	return &v1.TestAccountResponse{
-		Success:      false,
-		Message:      "TestAccount feature will be implemented in Story 2.3",
-		HealthScore:  0,
+		Success:        false,
+		Message:        "TestAccount feature will be implemented in Story 2.3",
+		HealthScore:    0,
 		ResponseTimeMs: 0,
 	}, nil
 }
