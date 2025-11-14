@@ -5,6 +5,7 @@ go 1.24.0
 toolchain go1.24.3
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/alicebob/miniredis/v2 v2.35.0
 	github.com/envoyproxy/protoc-gen-validate v1.0.4
 	github.com/go-kratos/kratos/v2 v2.8.0
@@ -18,6 +19,8 @@ require (
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
+	gorm.io/driver/mysql v1.6.0
+	gorm.io/gorm v1.31.1
 )
 
 require (
@@ -62,6 +65,4 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240528184218-531527333157 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gorm.io/driver/mysql v1.6.0 // indirect
-	gorm.io/gorm v1.31.1 // indirect
 )
