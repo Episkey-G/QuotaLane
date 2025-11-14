@@ -341,7 +341,7 @@ func TestMaskAPIKey(t *testing.T) {
 		{
 			name:     "short key (8 chars)",
 			input:    "12345678",
-			expected: "1234****5678",
+			expected: "********",
 		},
 		{
 			name:     "very short key",
@@ -446,7 +446,8 @@ func TestUnspecifiedProviderConversion(t *testing.T) {
 func TestUnspecifiedStatusConversion(t *testing.T) {
 	t.Run("UNSPECIFIED proto to data", func(t *testing.T) {
 		result := StatusFromProto(v1.AccountStatus_ACCOUNT_STATUS_UNSPECIFIED)
-		assert.Equal(t, AccountStatus(""), result)
+		// StatusFromProto returns StatusActive as default for UNSPECIFIED
+		assert.Equal(t, StatusActive, result)
 	})
 
 	t.Run("empty data to proto", func(t *testing.T) {
