@@ -1,0 +1,421 @@
+package data
+
+import (
+	"context"
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	v1 "QuotaLane/api/v1"
+
+	"github.com/go-kratos/kratos/v2/log"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
+)
+
+// AccountProvider represents the database ENUM type for provider.
+type AccountProvider string
+
+const (
+	ProviderClaudeOfficial  AccountProvider = "claude-official"
+	ProviderClaudeConsole   AccountProvider = "claude-console"
+	ProviderBedrock         AccountProvider = "bedrock"
+	ProviderCCR             AccountProvider = "ccr"
+	ProviderDroid           AccountProvider = "droid"
+	ProviderGemini          AccountProvider = "gemini"
+	ProviderOpenAIResponses AccountProvider = "openai-responses"
+	ProviderAzureOpenAI     AccountProvider = "azure-openai"
+)
+
+// AccountStatus represents the database ENUM type for status.
+type AccountStatus string
+
+const (
+	StatusActive   AccountStatus = "active"
+	StatusInactive AccountStatus = "inactive"
+	StatusError    AccountStatus = "error"
+)
+
+// Account is the GORM model for api_accounts table.
+type Account struct {
+	ID                 int64           `gorm:"primaryKey;column:id"`
+	Name               string          `gorm:"column:name;size:100;not null"`
+	Provider           AccountProvider `gorm:"column:provider;type:enum('claude-official','claude-console','bedrock','ccr','droid','gemini','openai-responses','azure-openai');not null"`
+	ApiKeyEncrypted    string          `gorm:"column:api_key_encrypted;type:text"`
+	OAuthDataEncrypted string          `gorm:"column:oauth_data_encrypted;type:text"`
+	RpmLimit           int32           `gorm:"column:rpm_limit;default:0;not null"`
+	TpmLimit           int32           `gorm:"column:tpm_limit;default:0;not null"`
+	HealthScore        int32           `gorm:"column:health_score;default:100;not null"`
+	IsCircuitBroken    bool            `gorm:"column:is_circuit_broken;default:false;not null"`
+	Status             AccountStatus   `gorm:"column:status;type:enum('active','inactive','error');default:'active';not null"`
+	Metadata           string          `gorm:"column:metadata;type:json"` // JSON string
+	CreatedAt          time.Time       `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP"`
+	UpdatedAt          time.Time       `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP"`
+}
+
+// TableName specifies the table name for GORM.
+func (Account) TableName() string {
+	return "api_accounts"
+}
+
+// Scan implements sql.Scanner interface for AccountProvider.
+func (p *AccountProvider) Scan(value interface{}) error {
+	if value == nil {
+		*p = ""
+		return nil
+	}
+	switch v := value.(type) {
+	case []byte:
+		*p = AccountProvider(v)
+	case string:
+		*p = AccountProvider(v)
+	default:
+		return fmt.Errorf("cannot scan type %T into AccountProvider", value)
+	}
+	return nil
+}
+
+// Value implements driver.Valuer interface for AccountProvider.
+func (p AccountProvider) Value() (driver.Value, error) {
+	return string(p), nil
+}
+
+// Scan implements sql.Scanner interface for AccountStatus.
+func (s *AccountStatus) Scan(value interface{}) error {
+	if value == nil {
+		*s = ""
+		return nil
+	}
+	switch v := value.(type) {
+	case []byte:
+		*s = AccountStatus(v)
+	case string:
+		*s = AccountStatus(v)
+	default:
+		return fmt.Errorf("cannot scan type %T into AccountStatus", value)
+	}
+	return nil
+}
+
+// Value implements driver.Valuer interface for AccountStatus.
+func (s AccountStatus) Value() (driver.Value, error) {
+	return string(s), nil
+}
+
+// ProviderToProto converts database AccountProvider to Proto enum.
+func ProviderToProto(p AccountProvider) v1.AccountProvider {
+	switch p {
+	case ProviderClaudeOfficial:
+		return v1.AccountProvider_CLAUDE_OFFICIAL
+	case ProviderClaudeConsole:
+		return v1.AccountProvider_CLAUDE_CONSOLE
+	case ProviderBedrock:
+		return v1.AccountProvider_BEDROCK
+	case ProviderCCR:
+		return v1.AccountProvider_CCR
+	case ProviderDroid:
+		return v1.AccountProvider_DROID
+	case ProviderGemini:
+		return v1.AccountProvider_GEMINI
+	case ProviderOpenAIResponses:
+		return v1.AccountProvider_OPENAI_RESPONSES
+	case ProviderAzureOpenAI:
+		return v1.AccountProvider_AZURE_OPENAI
+	default:
+		return v1.AccountProvider_ACCOUNT_PROVIDER_UNSPECIFIED
+	}
+}
+
+// ProviderFromProto converts Proto enum to database AccountProvider.
+func ProviderFromProto(p v1.AccountProvider) AccountProvider {
+	switch p {
+	case v1.AccountProvider_CLAUDE_OFFICIAL:
+		return ProviderClaudeOfficial
+	case v1.AccountProvider_CLAUDE_CONSOLE:
+		return ProviderClaudeConsole
+	case v1.AccountProvider_BEDROCK:
+		return ProviderBedrock
+	case v1.AccountProvider_CCR:
+		return ProviderCCR
+	case v1.AccountProvider_DROID:
+		return ProviderDroid
+	case v1.AccountProvider_GEMINI:
+		return ProviderGemini
+	case v1.AccountProvider_OPENAI_RESPONSES:
+		return ProviderOpenAIResponses
+	case v1.AccountProvider_AZURE_OPENAI:
+		return ProviderAzureOpenAI
+	default:
+		return ""
+	}
+}
+
+// StatusToProto converts database AccountStatus to Proto enum.
+func StatusToProto(s AccountStatus) v1.AccountStatus {
+	switch s {
+	case StatusActive:
+		return v1.AccountStatus_ACCOUNT_ACTIVE
+	case StatusInactive:
+		return v1.AccountStatus_ACCOUNT_INACTIVE
+	case StatusError:
+		return v1.AccountStatus_ACCOUNT_ERROR
+	default:
+		return v1.AccountStatus_ACCOUNT_STATUS_UNSPECIFIED
+	}
+}
+
+// StatusFromProto converts Proto enum to database AccountStatus.
+func StatusFromProto(s v1.AccountStatus) AccountStatus {
+	switch s {
+	case v1.AccountStatus_ACCOUNT_ACTIVE:
+		return StatusActive
+	case v1.AccountStatus_ACCOUNT_INACTIVE:
+		return StatusInactive
+	case v1.AccountStatus_ACCOUNT_ERROR:
+		return StatusError
+	default:
+		return StatusActive // Default to active
+	}
+}
+
+// ToProto converts GORM Account model to Proto Account message.
+func (a *Account) ToProto() *v1.Account {
+	return &v1.Account{
+		Id:                 a.ID,
+		Name:               a.Name,
+		Provider:           ProviderToProto(a.Provider),
+		ApiKeyEncrypted:    a.ApiKeyEncrypted,
+		OauthDataEncrypted: a.OAuthDataEncrypted,
+		RpmLimit:           a.RpmLimit,
+		TpmLimit:           a.TpmLimit,
+		HealthScore:        a.HealthScore,
+		IsCircuitBroken:    a.IsCircuitBroken,
+		Status:             StatusToProto(a.Status),
+		Metadata:           a.Metadata,
+		CreatedAt:          timestamppb.New(a.CreatedAt),
+		UpdatedAt:          timestamppb.New(a.UpdatedAt),
+	}
+}
+
+// MaskSensitiveData masks sensitive fields in Account for display.
+// API Key: show first 4 + last 4 characters (e.g., "sk-proj****1234")
+// OAuth Data: replace with "[ENCRYPTED]"
+func (a *Account) MaskSensitiveData() {
+	// Mask API Key
+	if a.ApiKeyEncrypted != "" && len(a.ApiKeyEncrypted) > 8 {
+		prefix := a.ApiKeyEncrypted[:4]
+		suffix := a.ApiKeyEncrypted[len(a.ApiKeyEncrypted)-4:]
+		a.ApiKeyEncrypted = prefix + "****" + suffix
+	}
+
+	// Mask OAuth Data
+	if a.OAuthDataEncrypted != "" {
+		a.OAuthDataEncrypted = "[ENCRYPTED]"
+	}
+}
+
+// AccountRepo defines the account repository interface.
+type AccountRepo interface {
+	CreateAccount(ctx context.Context, account *Account) error
+	GetAccount(ctx context.Context, id int64) (*Account, error)
+	ListAccounts(ctx context.Context, filter *AccountFilter) ([]*Account, int32, error)
+	UpdateAccount(ctx context.Context, account *Account) error
+	DeleteAccount(ctx context.Context, id int64) error
+}
+
+// AccountFilter defines query filter for listing accounts.
+type AccountFilter struct {
+	Page     int32           // Page number (starts from 1)
+	PageSize int32           // Page size (1-100)
+	Provider AccountProvider // Filter by provider (optional)
+	Status   AccountStatus   // Filter by status (optional)
+}
+
+// accountRepo implements AccountRepo interface.
+type accountRepo struct {
+	data   *Data
+	db     *gorm.DB
+	cache  CacheClient
+	logger *log.Helper
+}
+
+// NewAccountRepo creates a new account repository.
+func NewAccountRepo(data *Data, db *gorm.DB, logger log.Logger) AccountRepo {
+	return &accountRepo{
+		data:   data,
+		db:     db,
+		cache:  data.GetCache(),
+		logger: log.NewHelper(logger),
+	}
+}
+
+// CreateAccount creates a new account in the database.
+func (r *accountRepo) CreateAccount(ctx context.Context, account *Account) error {
+	if err := r.db.WithContext(ctx).Create(account).Error; err != nil {
+		r.logger.Errorf("failed to create account: %v", err)
+		return fmt.Errorf("failed to create account: %w", err)
+	}
+
+	r.logger.Infow("account created", "id", account.ID, "name", account.Name, "provider", account.Provider)
+	return nil
+}
+
+// GetAccount retrieves an account by ID with caching.
+// Cache key: "account:{id}", TTL: 5 minutes
+func (r *accountRepo) GetAccount(ctx context.Context, id int64) (*Account, error) {
+	cacheKey := fmt.Sprintf("account:%d", id)
+
+	// Try to get from cache first
+	var cachedAccount Account
+	if err := r.cache.Get(ctx, cacheKey, &cachedAccount); err == nil {
+		r.logger.Debugw("account cache hit", "id", id)
+		return &cachedAccount, nil
+	}
+
+	// Cache miss, query from database
+	var account Account
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&account).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("account not found: id=%d", id)
+		}
+		r.logger.Errorf("failed to get account: %v", err)
+		return nil, fmt.Errorf("failed to get account: %w", err)
+	}
+
+	// Store in cache (5 minutes TTL)
+	if err := r.cache.Set(ctx, cacheKey, &account, 5*time.Minute); err != nil {
+		r.logger.Warnw("failed to cache account", "id", id, "error", err)
+		// Cache failure doesn't affect the operation
+	}
+
+	r.logger.Debugw("account fetched from database", "id", id)
+	return &account, nil
+}
+
+// ListAccounts retrieves accounts with pagination and filters.
+func (r *accountRepo) ListAccounts(ctx context.Context, filter *AccountFilter) ([]*Account, int32, error) {
+	if filter == nil {
+		filter = &AccountFilter{Page: 1, PageSize: 20}
+	}
+
+	// Set defaults
+	if filter.Page < 1 {
+		filter.Page = 1
+	}
+	if filter.PageSize < 1 {
+		filter.PageSize = 20
+	}
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
+
+	// Build query with soft delete filter (status != inactive)
+	query := r.db.WithContext(ctx).Model(&Account{})
+
+	// Apply filters
+	if filter.Provider != "" {
+		query = query.Where("provider = ?", filter.Provider)
+	}
+	if filter.Status != "" {
+		query = query.Where("status = ?", filter.Status)
+	} else {
+		// Default: exclude inactive accounts (soft delete)
+		query = query.Where("status != ?", StatusInactive)
+	}
+
+	// Count total records
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		r.logger.Errorf("failed to count accounts: %v", err)
+		return nil, 0, fmt.Errorf("failed to count accounts: %w", err)
+	}
+
+	// Fetch paginated accounts
+	var accounts []*Account
+	offset := (filter.Page - 1) * filter.PageSize
+	if err := query.Offset(int(offset)).Limit(int(filter.PageSize)).
+		Order("created_at DESC").
+		Find(&accounts).Error; err != nil {
+		r.logger.Errorf("failed to list accounts: %v", err)
+		return nil, 0, fmt.Errorf("failed to list accounts: %w", err)
+	}
+
+	r.logger.Debugw("accounts listed", "count", len(accounts), "total", total, "page", filter.Page)
+	return accounts, int32(total), nil
+}
+
+// UpdateAccount updates an account and clears its cache.
+func (r *accountRepo) UpdateAccount(ctx context.Context, account *Account) error {
+	account.UpdatedAt = time.Now()
+
+	if err := r.db.WithContext(ctx).Save(account).Error; err != nil {
+		r.logger.Errorf("failed to update account: %v", err)
+		return fmt.Errorf("failed to update account: %w", err)
+	}
+
+	// Clear cache
+	cacheKey := fmt.Sprintf("account:%d", account.ID)
+	if err := r.cache.Delete(ctx, cacheKey); err != nil {
+		r.logger.Warnw("failed to delete account cache", "id", account.ID, "error", err)
+	}
+
+	r.logger.Infow("account updated", "id", account.ID, "name", account.Name)
+	return nil
+}
+
+// DeleteAccount performs soft delete (sets status to INACTIVE) and clears cache.
+func (r *accountRepo) DeleteAccount(ctx context.Context, id int64) error {
+	result := r.db.WithContext(ctx).
+		Model(&Account{}).
+		Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"status":     StatusInactive,
+			"updated_at": time.Now(),
+		})
+
+	if result.Error != nil {
+		r.logger.Errorf("failed to delete account: %v", result.Error)
+		return fmt.Errorf("failed to delete account: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("account not found: id=%d", id)
+	}
+
+	// Clear cache
+	cacheKey := fmt.Sprintf("account:%d", id)
+	if err := r.cache.Delete(ctx, cacheKey); err != nil {
+		r.logger.Warnw("failed to delete account cache", "id", id, "error", err)
+	}
+
+	r.logger.Infow("account deleted (soft)", "id", id)
+	return nil
+}
+
+// MaskApiKey masks API key for display (show first 4 + last 4 characters).
+func MaskApiKey(apiKey string) string {
+	if apiKey == "" {
+		return ""
+	}
+	if len(apiKey) <= 8 {
+		return strings.Repeat("*", len(apiKey))
+	}
+	prefix := apiKey[:4]
+	suffix := apiKey[len(apiKey)-4:]
+	return prefix + "****" + suffix
+}
+
+// ValidateMetadataJSON validates if metadata is valid JSON.
+func ValidateMetadataJSON(metadata string) error {
+	if metadata == "" {
+		return nil // Empty metadata is valid
+	}
+	var js json.RawMessage
+	if err := json.Unmarshal([]byte(metadata), &js); err != nil {
+		return fmt.Errorf("invalid JSON metadata: %w", err)
+	}
+	return nil
+}

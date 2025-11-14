@@ -88,7 +88,7 @@ func main() {
 		"log.output_file", bc.Log.OutputFile,
 	)
 
-	app, cleanup, err := wireApp(bc.Server, bc.Data, logger)
+	app, cleanup, err := wireApp(bc.Server, bc.Data, bc.Auth, logger)
 	if err != nil {
 		panic(err)
 	}

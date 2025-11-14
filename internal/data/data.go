@@ -11,9 +11,13 @@ import (
 )
 
 // ProviderSet is data providers.
-// TODO: Add repository implementations here when implementing business logic
-// Example: var ProviderSet = wire.NewSet(NewData, NewAccountRepo, NewRedisClient, NewCacheClient)
-var ProviderSet = wire.NewSet(NewData, NewRedisClient, NewCacheClient)
+var ProviderSet = wire.NewSet(
+	NewData,
+	NewRedisClient,
+	NewCacheClient,
+	NewMySQLClient,
+	NewAccountRepo,
+)
 
 // Data contains all data layer dependencies.
 type Data struct {
@@ -21,6 +25,7 @@ type Data struct {
 	redisClient *redis.Client
 	// cache is the cache interface for repository use
 	cache CacheClient
+	// Note: MySQL DB is not stored here, it's injected directly to repositories
 }
 
 // NewData creates a new Data instance with all data layer dependencies.

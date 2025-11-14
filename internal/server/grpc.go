@@ -3,7 +3,9 @@
 package server
 
 import (
+	v1 "QuotaLane/api/v1"
 	"QuotaLane/internal/conf"
+	"QuotaLane/internal/service"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
@@ -11,7 +13,7 @@ import (
 )
 
 // NewGRPCServer new a gRPC server.
-func NewGRPCServer(c *conf.Server, _ log.Logger) *grpc.Server {
+func NewGRPCServer(c *conf.Server, accountSvc *service.AccountService, _ log.Logger) *grpc.Server {
 	var opts = []grpc.ServerOption{
 		grpc.Middleware(
 			recovery.Recovery(),
@@ -27,7 +29,9 @@ func NewGRPCServer(c *conf.Server, _ log.Logger) *grpc.Server {
 		opts = append(opts, grpc.Timeout(c.Grpc.Timeout.AsDuration()))
 	}
 	srv := grpc.NewServer(opts...)
-	// TODO: Register gRPC services here
-	// Example: v1.RegisterAccountServiceServer(srv, accountService)
+
+	// Register gRPC services
+	v1.RegisterAccountServiceServer(srv, accountSvc)
+
 	return srv
 }
