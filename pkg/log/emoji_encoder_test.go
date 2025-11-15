@@ -209,7 +209,7 @@ func TestEmojiConsoleEncoder_EncodeEntry(t *testing.T) {
 				Message: "Request completed",
 			},
 			fields: []zapcore.Field{
-				zapcore.Field{Key: "status", Type: zapcore.Int64Type, Integer: 200},
+				{Key: "status", Type: zapcore.Int64Type, Integer: 200},
 			},
 			shouldHaveEmoji: true,
 			expectedEmoji:   "🟢",
