@@ -5,8 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -37,13 +35,13 @@ const (
 
 // CodexProvider Codex CLI OAuth Provider 实现
 type CodexProvider struct {
-	logger *log.Helper
+	*BaseProvider // 嵌入 BaseProvider
 }
 
 // NewCodexProvider 创建 Codex Provider 实例
 func NewCodexProvider(logger log.Logger) *CodexProvider {
 	return &CodexProvider{
-		logger: log.NewHelper(logger),
+		BaseProvider: NewBaseProvider(CodexTokenTimeout, logger),
 	}
 }
 
@@ -99,42 +97,12 @@ func (p *CodexProvider) ExchangeCode(ctx context.Context, code string, session *
 	}
 
 	// 构建请求体（application/x-www-form-urlencoded）
-	formData := url.Values{
-		"grant_type":    {"authorization_code"},
-		"client_id":     {CodexClientID},
-		"code":          {strings.TrimSpace(code)},
-		"redirect_uri":  {redirectURI},
-		"code_verifier": {session.CodeVerifier},
-	}
-
-	// 创建 HTTP 客户端
-	client, err := util.CreateHTTPClient(session.ProxyURL, CodexTokenTimeout)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
-	}
-
-	// 创建请求
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, CodexTokenURL, strings.NewReader(formData.Encode()))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	// 发送请求
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("OAuth error (HTTP %d): %s", resp.StatusCode, string(respData))
+	formData := map[string]string{
+		"grant_type":    "authorization_code",
+		"client_id":     CodexClientID,
+		"code":          strings.TrimSpace(code),
+		"redirect_uri":  redirectURI,
+		"code_verifier": session.CodeVerifier,
 	}
 
 	// 解析响应
@@ -146,8 +114,9 @@ func (p *CodexProvider) ExchangeCode(ctx context.Context, code string, session *
 		Scope        string `json:"scope"`
 	}
 
-	if err := json.Unmarshal(respData, &tokenResp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+	// 使用 BaseProvider 发送表单请求
+	if err := p.DoFormRequest(ctx, "POST", CodexTokenURL, nil, formData, &tokenResp, session.ProxyURL); err != nil {
+		return nil, err
 	}
 
 	if tokenResp.AccessToken == "" {
@@ -157,7 +126,7 @@ func (p *CodexProvider) ExchangeCode(ctx context.Context, code string, session *
 	// ⚠️ 解析 ID Token 提取 ChatGPT Account ID
 	accountID, err := p.parseIDToken(tokenResp.IDToken)
 	if err != nil {
-		p.logger.Warnf("Failed to parse ID token: %v", err)
+		p.GetLogger().Warnf("Failed to parse ID token: %v", err)
 	}
 
 	return &oauth.ExtendedTokenResponse{
@@ -173,43 +142,16 @@ func (p *CodexProvider) ExchangeCode(ctx context.Context, code string, session *
 // RefreshToken 刷新 Token
 func (p *CodexProvider) RefreshToken(ctx context.Context, refreshToken string, metadata *oauth.AccountMetadata) (*oauth.ExtendedTokenResponse, error) {
 	// ⚠️ 刷新时使用不含 offline_access 的 scopes
-	formData := url.Values{
-		"grant_type":    {"refresh_token"},
-		"client_id":     {CodexClientID},
-		"refresh_token": {refreshToken},
-		"scope":         {CodexScopesRefresh},
+	formData := map[string]string{
+		"grant_type":    "refresh_token",
+		"client_id":     CodexClientID,
+		"refresh_token": refreshToken,
+		"scope":         CodexScopesRefresh,
 	}
 
 	proxyURL := ""
 	if metadata != nil {
 		proxyURL = metadata.ProxyURL
-	}
-
-	client, err := util.CreateHTTPClient(proxyURL, CodexTokenTimeout)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, CodexTokenURL, strings.NewReader(formData.Encode()))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("OAuth error (HTTP %d): %s", resp.StatusCode, string(respData))
 	}
 
 	var tokenResp struct {
@@ -219,8 +161,9 @@ func (p *CodexProvider) RefreshToken(ctx context.Context, refreshToken string, m
 		ExpiresIn    int    `json:"expires_in"`
 	}
 
-	if err := json.Unmarshal(respData, &tokenResp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+	// 使用 BaseProvider 发送表单请求
+	if err := p.DoFormRequest(ctx, "POST", CodexTokenURL, nil, formData, &tokenResp, proxyURL); err != nil {
+		return nil, err
 	}
 
 	if tokenResp.AccessToken == "" {
@@ -230,7 +173,7 @@ func (p *CodexProvider) RefreshToken(ctx context.Context, refreshToken string, m
 	// ⚠️ Refresh Token 回退逻辑
 	finalRefreshToken := tokenResp.RefreshToken
 	if finalRefreshToken == "" {
-		p.logger.Warnf("OpenAI did not return new refresh_token, keeping the old one")
+		p.GetLogger().Warnf("OpenAI did not return new refresh_token, keeping the old one")
 		finalRefreshToken = refreshToken
 	}
 

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"QuotaLane/internal/data"
+	"QuotaLane/pkg/oauth"
 )
 
 const (
@@ -77,8 +78,20 @@ func (uc *AccountUsecase) ValidateOpenAIResponsesAccount(ctx context.Context, ac
 		}
 	}
 
-	// 4. 调用 OpenAI 服务验证 API Key
-	err = uc.openaiService.ValidateAPIKey(ctx, account.BaseAPI, apiKey, proxyURL)
+	// 4. 通过 OAuth Manager 获取 Provider 并验证
+	provider := uc.oauthManager.GetProvider(data.ProviderOpenAIResponses)
+	if provider == nil {
+		return fmt.Errorf("OpenAI Responses provider not registered")
+	}
+
+	// 构建 AccountMetadata
+	accountMetadata := &oauth.AccountMetadata{
+		ProxyURL: proxyURL,
+		BaseAPI:  account.BaseAPI,
+	}
+
+	// 调用 Provider 验证 API Key
+	err = provider.ValidateToken(ctx, apiKey, accountMetadata)
 
 	if err != nil {
 		// 验证失败：记录错误、减分、更新状态

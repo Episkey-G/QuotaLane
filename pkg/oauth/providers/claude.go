@@ -1,12 +1,8 @@
 package providers
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -37,13 +33,13 @@ const (
 
 // ClaudeProvider Claude OAuth Provider 实现
 type ClaudeProvider struct {
-	logger *log.Helper
+	*BaseProvider // 嵌入 BaseProvider
 }
 
 // NewClaudeProvider 创建 Claude Provider 实例
 func NewClaudeProvider(logger log.Logger) *ClaudeProvider {
 	return &ClaudeProvider{
-		logger: log.NewHelper(logger),
+		BaseProvider: NewBaseProvider(ClaudeTokenTimeout, logger),
 	}
 }
 
@@ -108,43 +104,9 @@ func (p *ClaudeProvider) ExchangeCode(ctx context.Context, code string, session 
 		"state":         session.State,
 	}
 
-	reqData, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request body: %w", err)
-	}
-
-	// 创建 HTTP 客户端（支持代理）
-	client, err := util.CreateHTTPClient(session.ProxyURL, ClaudeTokenTimeout)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
-	}
-
-	// 创建 HTTP 请求
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ClaudeTokenURL, bytes.NewReader(reqData))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", ClaudeUserAgent)
-	req.Header.Set("Accept", "application/json")
-
-	// 发送请求
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// 读取响应体
-	respData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	// 检查 HTTP 状态码
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("OAuth error (HTTP %d): %s", resp.StatusCode, string(respData))
+	// 构建请求头（Claude 特定）
+	headers := map[string]string{
+		"User-Agent": ClaudeUserAgent,
 	}
 
 	// 解析响应 JSON
@@ -157,8 +119,9 @@ func (p *ClaudeProvider) ExchangeCode(ctx context.Context, code string, session 
 		Account      map[string]interface{} `json:"account"`
 	}
 
-	if err := json.Unmarshal(respData, &tokenResp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+	// 使用 BaseProvider 发送 JSON 请求
+	if err := p.DoJSONRequest(ctx, "POST", ClaudeTokenURL, headers, reqBody, &tokenResp, session.ProxyURL); err != nil {
+		return nil, err
 	}
 
 	// 验证必填字段
@@ -195,48 +158,9 @@ func (p *ClaudeProvider) RefreshToken(ctx context.Context, refreshToken string, 
 		"refresh_token": refreshToken,
 	}
 
-	reqData, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request body: %w", err)
-	}
-
-	// 创建 HTTP 客户端（支持代理）
-	proxyURL := ""
-	if metadata != nil {
-		proxyURL = metadata.ProxyURL
-	}
-
-	client, err := util.CreateHTTPClient(proxyURL, ClaudeTokenTimeout)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
-	}
-
-	// 创建 HTTP 请求
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ClaudeTokenURL, bytes.NewReader(reqData))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", ClaudeUserAgent)
-	req.Header.Set("Accept", "application/json")
-
-	// 发送请求
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// 读取响应体
-	respData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	// 检查 HTTP 状态码
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("OAuth error (HTTP %d): %s", resp.StatusCode, string(respData))
+	// 构建请求头（Claude 特定）
+	headers := map[string]string{
+		"User-Agent": ClaudeUserAgent,
 	}
 
 	// 解析响应 JSON
@@ -247,8 +171,15 @@ func (p *ClaudeProvider) RefreshToken(ctx context.Context, refreshToken string, 
 		Scope        string `json:"scope"`
 	}
 
-	if err := json.Unmarshal(respData, &tokenResp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+	// 获取代理 URL
+	proxyURL := ""
+	if metadata != nil {
+		proxyURL = metadata.ProxyURL
+	}
+
+	// 使用 BaseProvider 发送 JSON 请求
+	if err := p.DoJSONRequest(ctx, "POST", ClaudeTokenURL, headers, reqBody, &tokenResp, proxyURL); err != nil {
+		return nil, err
 	}
 
 	// 验证必填字段

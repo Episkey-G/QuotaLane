@@ -44,6 +44,11 @@ func (m *OAuthManager) RegisterProvider(p OAuthProvider) {
 	m.logger.Infof("Registered OAuth provider: %s", p.ProviderType())
 }
 
+// GetProvider 获取 OAuth Provider
+func (m *OAuthManager) GetProvider(provider data.AccountProvider) OAuthProvider {
+	return m.providers[provider]
+}
+
 // GenerateAuthURL 生成 OAuth 授权 URL
 func (m *OAuthManager) GenerateAuthURL(ctx context.Context, provider data.AccountProvider, params *OAuthParams) (*OAuthURLResponse, error) {
 	// 获取 Provider

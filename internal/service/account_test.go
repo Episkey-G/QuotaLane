@@ -86,8 +86,8 @@ func (m *MockAccountRepo) ListAccountsByProvider(ctx context.Context, provider d
 	return args.Get(0).([]*data.Account), args.Error(1)
 }
 
-func (m *MockAccountRepo) ListCodexCLIAccountsNeedingRefresh(ctx context.Context, threshold time.Time) ([]*data.Account, error) {
-	args := m.Called(ctx, threshold)
+func (m *MockAccountRepo) ListCodexCLIAccountsNeedingRefresh(ctx context.Context) ([]*data.Account, error) {
+	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

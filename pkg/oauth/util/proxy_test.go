@@ -26,7 +26,11 @@ func TestCreateHTTPClient(t *testing.T) {
 			checkFunc: func(t *testing.T, client *http.Client) {
 				assert.NotNil(t, client)
 				assert.Equal(t, 10*time.Second, client.Timeout)
-				assert.Nil(t, client.Transport, "Transport should be nil for direct connection")
+				// Transport should be configured even without proxy (for connection pooling)
+				assert.NotNil(t, client.Transport, "Transport should be configured for connection pooling")
+				transport, ok := client.Transport.(*http.Transport)
+				assert.True(t, ok, "Transport should be *http.Transport")
+				assert.Nil(t, transport.Proxy, "Proxy function should be nil for direct connection")
 			},
 		},
 		{

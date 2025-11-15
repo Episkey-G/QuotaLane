@@ -58,7 +58,7 @@ func newCryptoService(auth *conf.Auth) (*crypto.AESCrypto, error) {
 }
 
 // newOAuthManager creates OAuth Manager and registers providers.
-func newOAuthManager(dataData *data.Data, logger log.Logger) *oauth.OAuthManager {
+func newOAuthManager(dataData *data.Data, openaiService openai.OpenAIService, logger log.Logger) *oauth.OAuthManager {
 	manager := oauth.NewOAuthManager(dataData.GetRedisClient(), logger)
 
 	// 注册 Claude OAuth Provider
@@ -68,6 +68,10 @@ func newOAuthManager(dataData *data.Data, logger log.Logger) *oauth.OAuthManager
 	// 注册 Codex CLI OAuth Provider
 	codexProvider := providers.NewCodexProvider(logger)
 	manager.RegisterProvider(codexProvider)
+
+	// 注册 OpenAI Responses Provider（非 OAuth，仅 ValidateToken）
+	openaiResponsesProvider := providers.NewOpenAIResponsesProvider(openaiService, logger)
+	manager.RegisterProvider(openaiResponsesProvider)
 
 	return manager
 }

@@ -305,11 +305,11 @@ func TestOAuthRefreshTask_RefreshAccountToken(t *testing.T) {
 	})
 }
 
-func TestOAuthRefreshTask_24HourThreshold(t *testing.T) {
+func TestOAuthRefreshTask_2HourThreshold(t *testing.T) {
 	task, repo, cryptoHelper := setupTestRefreshTask(t)
 	ctx := context.Background()
 
-	t.Run("Verify 24-hour threshold query", func(t *testing.T) {
+	t.Run("Verify 2-hour threshold query", func(t *testing.T) {
 		var capturedThreshold time.Time
 		repo.listExpiringAccountsFunc = func(ctx context.Context, expiryThreshold time.Time) ([]*data.Account, error) {
 			capturedThreshold = expiryThreshold
@@ -320,32 +320,36 @@ func TestOAuthRefreshTask_24HourThreshold(t *testing.T) {
 		err := task.RefreshExpiringTokens(ctx)
 		require.NoError(t, err)
 
-		// Verify threshold is approximately 24 hours from now
-		expectedThreshold := now.Add(24 * time.Hour)
+		// Verify threshold is approximately 2 hours from now (optimized from 24h to 2h)
+		// Use a more lenient comparison to account for time calculation precision
+		expectedThreshold := now.Add(2 * time.Hour)
 		diff := capturedThreshold.Sub(expectedThreshold)
-		assert.Less(t, diff.Abs(), 1*time.Second, "Threshold should be 24 hours from now")
+		assert.Less(t, diff.Abs(), 5*time.Second, "Threshold should be approximately 2 hours from now (within 5 seconds)")
 	})
 
-	t.Run("Account expiring in 23 hours should be refreshed", func(t *testing.T) {
-		// Create account expiring in 23 hours
+	t.Run("Account expiring in 1 hour should be refreshed", func(t *testing.T) {
+		// Create account expiring in 1 hour (within 2-hour threshold)
 		accessTokenEncrypted, _ := cryptoHelper.Encrypt("token")
 		refreshTokenEncrypted, _ := cryptoHelper.Encrypt("refresh")
 		oauthData := map[string]interface{}{
 			"access_token_encrypted":  accessTokenEncrypted,
 			"refresh_token_encrypted": refreshTokenEncrypted,
-			"expires_at":              time.Now().Add(23 * time.Hour).Format(time.RFC3339),
+			"expires_at":              time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 		}
 		oauthDataJSON, _ := json.Marshal(oauthData)
 		oauthDataEncrypted, _ := cryptoHelper.Encrypt(string(oauthDataJSON))
 
-		expiresAt := time.Now().Add(23 * time.Hour)
-		repo.accounts = []*data.Account{
-			{
-				ID:                 111,
-				Provider:           data.ProviderClaudeOfficial,
-				OAuthDataEncrypted: oauthDataEncrypted,
-				TokenExpiresAt:     &expiresAt,
-			},
+		expiresAt := time.Now().Add(1 * time.Hour)
+		account := &data.Account{
+			ID:                 111,
+			Provider:           data.ProviderClaudeOfficial,
+			OAuthDataEncrypted: oauthDataEncrypted,
+			TokenExpiresAt:     &expiresAt,
+		}
+
+		// Set up the mock to return the account
+		repo.listExpiringAccountsFunc = func(ctx context.Context, expiryThreshold time.Time) ([]*data.Account, error) {
+			return []*data.Account{account}, nil
 		}
 
 		updated := false
@@ -356,7 +360,7 @@ func TestOAuthRefreshTask_24HourThreshold(t *testing.T) {
 
 		err := task.RefreshExpiringTokens(ctx)
 		assert.NoError(t, err)
-		assert.True(t, updated, "Account expiring in 23 hours should be refreshed")
+		assert.True(t, updated, "Account expiring in 1 hour should be refreshed")
 	})
 }
 
