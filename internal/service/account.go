@@ -214,10 +214,12 @@ func (s *AccountService) TestAccount(ctx context.Context, req *v1.TestAccountReq
 	// 计算响应时间
 	responseTimeMs := time.Since(startTime).Milliseconds()
 
-	// 安全转换 int64 to int32，防止溢出
-	responseTimeMsInt32 := int32(responseTimeMs)
+	// 安全转换 int64 to int32，防止溢出（#nosec G115）
+	var responseTimeMsInt32 int32
 	if responseTimeMs > 2147483647 { // int32 max value
 		responseTimeMsInt32 = 2147483647 // Cap at max int32 value
+	} else {
+		responseTimeMsInt32 = int32(responseTimeMs) // #nosec G115
 	}
 
 	// 脱敏 API Key 和 Base API（前 8 位 + ****）
