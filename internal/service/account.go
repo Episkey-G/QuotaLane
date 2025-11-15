@@ -8,6 +8,7 @@ import (
 
 	v1 "QuotaLane/api/v1"
 	"QuotaLane/internal/biz"
+	"QuotaLane/internal/service/oauth"
 	pkgerrors "QuotaLane/pkg/errors"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -20,15 +21,24 @@ import (
 type AccountService struct {
 	v1.UnimplementedAccountServiceServer
 
-	uc     *biz.AccountUsecase
-	logger *log.Helper
+	uc            *biz.AccountUsecase
+	oauthRegistry *oauth.Registry
+	logger        *log.Helper
 }
 
 // NewAccountService creates a new AccountService instance.
 func NewAccountService(uc *biz.AccountUsecase, logger log.Logger) *AccountService {
+	// Initialize OAuth handler registry
+	registry := oauth.NewRegistry(logger)
+
+	// Register OAuth handlers for each provider
+	registry.Register(oauth.NewClaudeHandler(uc, logger))
+	registry.Register(oauth.NewCodexHandler(uc, logger))
+
 	return &AccountService{
-		uc:     uc,
-		logger: log.NewHelper(logger),
+		uc:            uc,
+		oauthRegistry: registry,
+		logger:        log.NewHelper(logger),
 	}
 }
 
@@ -191,7 +201,7 @@ func (s *AccountService) RefreshToken(ctx context.Context, req *v1.RefreshTokenR
 	return &v1.RefreshTokenResponse{
 		Success:   true,
 		Message:   "Token refreshed successfully",
-		ExpiresAt: account.OauthExpiresAt, // 返回真实的 OAuth Token 过期时间
+		ExpiresAt: account.OAuthExpiresAt, // 返回真实的 OAuth Token 过期时间
 	}, nil
 }
 
@@ -237,15 +247,6 @@ func (s *AccountService) TestAccount(ctx context.Context, req *v1.TestAccountReq
 			message = fmt.Sprintf("Claude account test failed: %v", testErr)
 		}
 
-	case v1.AccountProvider_CODEX_CLI:
-		// Codex CLI: 调用 ValidateCodexCLIAccount
-		testErr = s.uc.ValidateCodexCLIAccount(ctx, req.Id)
-		if testErr == nil {
-			message = "Codex CLI account test passed"
-		} else {
-			message = fmt.Sprintf("Codex CLI account test failed: %v", testErr)
-		}
-
 	default:
 		// 其他类型暂不支持
 		message = fmt.Sprintf("该账户类型暂不支持健康检查: %s", account.Provider.String())
@@ -289,89 +290,74 @@ func (s *AccountService) TestAccount(ctx context.Context, req *v1.TestAccountReq
 	}, nil
 }
 
-// ========== Codex CLI OAuth 授权流程 ==========
-
-// GenerateOpenAIAuthURL 生成 OpenAI OAuth 授权链接
-func (s *AccountService) GenerateOpenAIAuthURL(ctx context.Context, req *v1.GenerateOpenAIAuthURLRequest) (*v1.GenerateOpenAIAuthURLResponse, error) {
-	s.logger.Infow("GenerateOpenAIAuthURL called", "proxy_url", req.GetProxyUrl())
-
-	// 调用 Biz 层生成授权 URL
-	authURL, sessionID, state, err := s.uc.GenerateOpenAIAuthURL(ctx, req.GetProxyUrl())
-	if err != nil {
-		s.logger.Errorw("failed to generate OpenAI auth URL", "error", err)
-		return nil, err
-	}
-
-	s.logger.Infow("OpenAI auth URL generated successfully",
-		"session_id", sessionID,
-		"proxy_url", req.GetProxyUrl())
-
-	return &v1.GenerateOpenAIAuthURLResponse{
-		AuthUrl:   authURL,
-		SessionId: sessionID,
-		State:     state,
-	}, nil
-}
-
-// ExchangeOpenAICode 交换 OpenAI OAuth 授权码并创建账户
-func (s *AccountService) ExchangeOpenAICode(ctx context.Context, req *v1.ExchangeOpenAICodeRequest) (*v1.ExchangeOpenAICodeResponse, error) {
-	s.logger.Infow("ExchangeOpenAICode called",
-		"session_id", req.SessionId,
-		"name", req.Name)
-
-	// 调用 Biz 层交换授权码并创建账户
-	accountID, accountName, status, tokenExpiresAt, err := s.uc.ExchangeOpenAICode(
-		ctx,
-		req.SessionId,
-		req.Code,
-		req.Name,
-		req.GetDescription(),
-		req.GetRpmLimit(),
-		req.GetTpmLimit(),
-		req.GetMetadata(),
-	)
-
-	if err != nil {
-		s.logger.Errorw("failed to exchange OpenAI code",
-			"session_id", req.SessionId,
-			"error", err)
-
-		// 【Fail Fast】验证失败时不会创建账户（已在 Biz 层实现）
-		// 将数据库错误映射为 gRPC Status Codes
-		return nil, mapDBErrorToGRPCStatus(err)
-	}
-
-	// 转换状态为 Proto 枚举
-	var protoStatus v1.AccountStatus
-	switch status {
-	case "active":
-		protoStatus = v1.AccountStatus_ACCOUNT_ACTIVE
-	case "created":
-		protoStatus = v1.AccountStatus_ACCOUNT_CREATED
-	case "error":
-		protoStatus = v1.AccountStatus_ACCOUNT_ERROR
-	default:
-		protoStatus = v1.AccountStatus_ACCOUNT_STATUS_UNSPECIFIED
-	}
-
-	s.logger.Infow("OpenAI code exchanged successfully",
-		"account_id", accountID,
-		"account_name", accountName,
-		"status", status)
-
-	return &v1.ExchangeOpenAICodeResponse{
-		AccountId:      accountID,
-		AccountName:    accountName,
-		Status:         protoStatus,
-		Message:        "Codex CLI account created successfully",
-		TokenExpiresAt: timestampProto(tokenExpiresAt),
-	}, nil
-}
-
 // timestampProto 将 *time.Time 转换为 *timestamppb.Timestamp
 func timestampProto(t *time.Time) *timestamppb.Timestamp {
 	if t == nil {
 		return nil
 	}
 	return timestamppb.New(*t)
+}
+
+// ========== 统一 OAuth 授权流程 RPC 实现 ==========
+
+// GenerateOAuthURL 生成 OAuth 授权 URL（统一接口）
+func (s *AccountService) GenerateOAuthURL(ctx context.Context, req *v1.GenerateOAuthURLRequest) (*v1.GenerateOAuthURLResponse, error) {
+	s.logger.Infow("GenerateOAuthURL called", "provider", req.Provider)
+
+	// Delegate to provider-specific handler
+	resp, err := s.oauthRegistry.GenerateAuthURL(ctx, req)
+	if err != nil {
+		s.logger.Errorw("failed to generate OAuth URL", "error", err, "provider", req.Provider)
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to generate OAuth URL: %v", err))
+	}
+
+	s.logger.Infow("OAuth URL generated successfully", "provider", req.Provider, "session_id", resp.SessionId)
+	return resp, nil
+}
+
+// ExchangeOAuthCode 交换 OAuth 授权码（统一接口）
+func (s *AccountService) ExchangeOAuthCode(ctx context.Context, req *v1.ExchangeOAuthCodeRequest) (*v1.ExchangeOAuthCodeResponse, error) {
+	s.logger.Infow("ExchangeOAuthCode called", "session_id", req.SessionId, "name", req.Name)
+
+	// Delegate to provider-specific handler
+	resp, err := s.oauthRegistry.ExchangeCode(ctx, req)
+	if err != nil {
+		s.logger.Errorw("failed to exchange OAuth code", "error", err, "session_id", req.SessionId)
+
+		// Map error types to appropriate gRPC codes
+		if contains(err.Error(), "session not found") || contains(err.Error(), "expired") {
+			return nil, statusError(codes.InvalidArgument, "session not found or expired")
+		}
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to exchange code: %v", err))
+	}
+
+	s.logger.Infow("OAuth code exchanged successfully", "account_id", resp.AccountId, "account_name", resp.AccountName)
+	return resp, nil
+}
+
+// PollOAuthStatus 轮询 OAuth 授权状态（Device Flow 预留接口）
+func (s *AccountService) PollOAuthStatus(ctx context.Context, req *v1.PollOAuthStatusRequest) (*v1.PollOAuthStatusResponse, error) {
+	s.logger.Infow("PollOAuthStatus called", "session_id", req.SessionId)
+
+	// TODO: 实现 Device Flow 状态轮询逻辑
+	// 当前返回未实现错误
+	return nil, status.Error(codes.Unimplemented, "Device Flow is not yet implemented")
+}
+
+// contains checks if a string contains a substring
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || containsMiddle(s, substr)))
+}
+
+func containsMiddle(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+func statusError(code codes.Code, msg string) error {
+	return status.Error(code, msg)
 }

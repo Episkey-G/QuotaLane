@@ -140,10 +140,10 @@ redis-flush:
 	@echo "Redis cache cleared successfully"
 
 .PHONY: all
-# generate all
+# generate all (proto + wire + go generate)
 all:
-	make api;
-	make config;
+	make proto;
+	make wire;
 	make generate;
 
 # show help

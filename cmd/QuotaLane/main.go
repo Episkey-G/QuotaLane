@@ -6,6 +6,7 @@ import (
 	"context"
 	"flag"
 	"os"
+	"time"
 
 	"QuotaLane/internal/biz"
 	"QuotaLane/internal/conf"
@@ -96,7 +97,7 @@ func main() {
 	defer cleanup()
 
 	// Initialize and start cron scheduler for OAuth token refresh
-	cronScheduler := setupCronJobs(appComponents.AccountUC, logger)
+	cronScheduler := setupCronJobs(appComponents.AccountUC, appComponents.OAuthRefreshTask, logger)
 	cronScheduler.Start()
 	defer cronScheduler.Stop()
 
@@ -110,15 +111,41 @@ func main() {
 
 // setupCronJobs configures and returns the cron scheduler.
 // The scheduler runs AutoRefreshTokens every 5 minutes.
-func setupCronJobs(accountUC *biz.AccountUsecase, logger log.Logger) *cron.Cron {
+func setupCronJobs(accountUC *biz.AccountUsecase, oauthRefreshTask *biz.OAuthRefreshTask, logger log.Logger) *cron.Cron {
 	helper := log.NewHelper(logger)
 
-	// Create cron scheduler with default configuration
-	c := cron.New()
+	// Create cron scheduler with seconds support for unified OAuth refresh
+	c := cron.New(cron.WithSeconds())
+
+	// Add UNIFIED OAuth token refresh job (every 6 hours: 0:00, 6:00, 12:00, 18:00)
+	// Refreshes all OAuth accounts (Claude, Codex) with tokens expiring within 2 hours
+	// 优化：避免频繁刷新短期 token（如 Claude 8h），只在真正快过期时刷新
+	// Cron format with seconds: "0 0 */6 * * *" (sec min hour day month dow)
+	_, err := c.AddFunc("0 0 */6 * * *", func() {
+		defer func() {
+			if r := recover(); r != nil {
+				helper.Errorf("panic in unified OAuth token refresh cron job: %v", r)
+			}
+		}()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+
+		helper.Info("Starting unified OAuth token refresh task...")
+		if err := oauthRefreshTask.RefreshExpiringTokens(ctx); err != nil {
+			helper.Errorw("Unified OAuth token refresh task failed", "error", err)
+		} else {
+			helper.Info("Unified OAuth token refresh task completed successfully")
+		}
+	})
+
+	if err != nil {
+		helper.Fatalf("failed to add unified OAuth refresh cron job: %v", err)
+	}
 
 	// Add OAuth token refresh job (every 5 minutes)
-	// Cron format: "*/5 * * * *" = at minute 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
-	_, err := c.AddFunc("*/5 * * * *", func() {
+	// Cron format with seconds: "0 */5 * * * *" = at minute 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
+	_, err = c.AddFunc("0 */5 * * * *", func() {
 		defer func() {
 			if r := recover(); r != nil {
 				helper.Errorf("panic in OAuth token refresh cron job: %v", r)
@@ -140,9 +167,9 @@ func setupCronJobs(accountUC *biz.AccountUsecase, logger log.Logger) *cron.Cron 
 	}
 
 	// Add OpenAI Responses health check job (every 10 minutes, offset from OAuth refresh)
-	// Cron format: "2-59/10 * * * *" = at minute 2, 12, 22, 32, 42, 52
+	// Cron format: "0 2-59/10 * * * *" = at minute 2, 12, 22, 32, 42, 52
 	// This avoids conflict with OAuth refresh (0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55)
-	_, err = c.AddFunc("2-59/10 * * * *", func() {
+	_, err = c.AddFunc("0 2-59/10 * * * *", func() {
 		defer func() {
 			if r := recover(); r != nil {
 				helper.Errorf("panic in OpenAI health check cron job: %v", r)
@@ -161,30 +188,6 @@ func setupCronJobs(accountUC *biz.AccountUsecase, logger log.Logger) *cron.Cron 
 
 	if err != nil {
 		helper.Fatalf("failed to add OpenAI health check cron job: %v", err)
-	}
-
-	// Add Codex CLI OAuth token refresh job (every 5 minutes, same as Claude OAuth)
-	// Cron format: "*/5 * * * *" = at minute 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
-	// This shares the same schedule as Claude OAuth refresh for simplicity
-	_, err = c.AddFunc("*/5 * * * *", func() {
-		defer func() {
-			if r := recover(); r != nil {
-				helper.Errorf("panic in Codex CLI token refresh cron job: %v", r)
-			}
-		}()
-
-		ctx := context.Background()
-		helper.Info("Starting Codex CLI token refresh cron job")
-
-		if err := accountUC.RefreshCodexCLITokens(ctx); err != nil {
-			helper.Errorf("Codex CLI token refresh cron job failed: %v", err)
-		} else {
-			helper.Info("Codex CLI token refresh cron job completed successfully")
-		}
-	})
-
-	if err != nil {
-		helper.Fatalf("failed to add Codex CLI refresh cron job: %v", err)
 	}
 
 	return c

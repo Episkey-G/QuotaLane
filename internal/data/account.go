@@ -211,7 +211,7 @@ func (a *Account) ToProto() *v1.Account {
 		Name:               a.Name,
 		Provider:           ProviderToProto(a.Provider),
 		ApiKeyEncrypted:    a.APIKeyEncrypted,
-		OauthDataEncrypted: a.OAuthDataEncrypted,
+		OAuthDataEncrypted: a.OAuthDataEncrypted,
 		RpmLimit:           a.RpmLimit,
 		TpmLimit:           a.TpmLimit,
 		HealthScore:        a.HealthScore,
@@ -224,7 +224,7 @@ func (a *Account) ToProto() *v1.Account {
 
 	// OAuthExpiresAt 可为空，只有在非 nil 时才转换
 	if a.OAuthExpiresAt != nil {
-		proto.OauthExpiresAt = timestamppb.New(*a.OAuthExpiresAt)
+		proto.OAuthExpiresAt = timestamppb.New(*a.OAuthExpiresAt)
 	}
 
 	return proto

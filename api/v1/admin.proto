@@ -72,74 +72,74 @@ message GetDashboardRequest {
 
 // DashboardData 仪表板数据
 message DashboardData {
-  int64 total_users = 1;           // 总用户数
-  int64 active_users = 2;          // 活跃用户数
-  int64 total_requests_today = 3;  // 今日请求总数
-  int64 total_requests_month = 4;  // 本月请求总数
-  double error_rate = 5;           // 错误率（百分比）
-  int32 active_accounts = 6;       // 活跃账号数
-  int32 total_accounts = 7;        // 总账号数
-  double total_revenue = 8;        // 总收入（美元）
-  double monthly_revenue = 9;      // 本月收入（美元）
+  int64 TotalUsers = 1;           // 总用户数
+  int64 ActiveUsers = 2;          // 活跃用户数
+  int64 TotalRequestsToday = 3;  // 今日请求总数
+  int64 TotalRequestsMonth = 4;  // 本月请求总数
+  double ErrorRate = 5;           // 错误率（百分比）
+  int32 ActiveAccounts = 6;       // 活跃账号数
+  int32 TotalAccounts = 7;        // 总账号数
+  double TotalRevenue = 8;        // 总收入（美元）
+  double MonthlyRevenue = 9;      // 本月收入（美元）
 }
 
 // GetDashboardResponse 获取仪表板响应
 message GetDashboardResponse {
-  DashboardData data = 1;  // 仪表板数据
+  DashboardData Data = 1;  // 仪表板数据
 }
 
 // GetMetricsRequest 获取系统指标请求
 message GetMetricsRequest {
-  optional string metric_name = 1;  // 指标名称（可选，不指定则返回所有）
-  google.protobuf.Timestamp start_time = 2;  // 开始时间（必填）
-  google.protobuf.Timestamp end_time = 3;    // 结束时间（必填）
-  optional int32 interval_seconds = 4 [(validate.rules).int32 = {gte: 60}];  // 时间间隔（秒，可选，默认300）
+  optional string MetricName = 1;  // 指标名称（可选，不指定则返回所有）
+  google.protobuf.Timestamp StartTime = 2;  // 开始时间（必填）
+  google.protobuf.Timestamp EndTime = 3;    // 结束时间（必填）
+  optional int32 IntervalSeconds = 4 [(validate.rules).int32 = {gte: 60}];  // 时间间隔（秒，可选，默认300）
 }
 
 // MetricsData 系统指标数据
 message MetricsData {
-  string metric_name = 1;                           // 指标名称
-  repeated DataPoint data_points = 2;               // 数据点列表
+  string MetricName = 1;                           // 指标名称
+  repeated DataPoint DataPoints = 2;               // 数据点列表
 }
 
 // DataPoint 数据点
 message DataPoint {
-  google.protobuf.Timestamp timestamp = 1;  // 时间戳
-  double value = 2;                         // 指标值
-  map<string, string> labels = 3;           // 标签（如 account_id, user_id）
+  google.protobuf.Timestamp Timestamp = 1;  // 时间戳
+  double Value = 2;                         // 指标值
+  map<string, string> Labels = 3;           // 标签（如 account_id, user_id）
 }
 
 // GetMetricsResponse 获取系统指标响应
 message GetMetricsResponse {
-  repeated MetricsData metrics = 1;  // 指标列表
+  repeated MetricsData Metrics = 1;  // 指标列表
 }
 
 // GetUsageStatsRequest 获取使用统计请求
 message GetUsageStatsRequest {
-  optional int64 user_id = 1;        // 按用户ID过滤（可选）
-  optional int64 account_id = 2;     // 按账户ID过滤（可选）
-  google.protobuf.Timestamp start_time = 3;  // 开始时间（必填）
-  google.protobuf.Timestamp end_time = 4;    // 结束时间（必填）
-  optional string group_by = 5;      // 分组字段（user, account, model）（可选）
+  optional int64 UserId = 1;        // 按用户ID过滤（可选）
+  optional int64 AccountId = 2;     // 按账户ID过滤（可选）
+  google.protobuf.Timestamp StartTime = 3;  // 开始时间（必填）
+  google.protobuf.Timestamp EndTime = 4;    // 结束时间（必填）
+  optional string GroupBy = 5;      // 分组字段（user, account, model）（可选）
 }
 
 // UsageStats 使用统计数据
 message UsageStats {
-  int64 total_requests = 1;          // 总请求数
-  int64 input_tokens = 2;            // 输入tokens
-  int64 output_tokens = 3;           // 输出tokens
-  int64 cache_creation_tokens = 4;   // 缓存创建tokens
-  int64 cache_read_tokens = 5;       // 缓存读取tokens
-  double total_cost = 6;             // 总成本（美元）
-  string group_key = 7;              // 分组键（user_id, account_id, model等）
-  string group_value = 8;            // 分组值
+  int64 TotalRequests = 1;          // 总请求数
+  int64 InputTokens = 2;            // 输入tokens
+  int64 OutputTokens = 3;           // 输出tokens
+  int64 CacheCreationTokens = 4;   // 缓存创建tokens
+  int64 CacheReadTokens = 5;       // 缓存读取tokens
+  double TotalCost = 6;             // 总成本（美元）
+  string GroupKey = 7;              // 分组键（user_id, account_id, model等）
+  string GroupValue = 8;            // 分组值
 }
 
 // GetUsageStatsResponse 获取使用统计响应
 message GetUsageStatsResponse {
-  repeated UsageStats stats = 1;  // 统计数据列表
-  int64 total_requests = 2;       // 总请求数（汇总）
-  double total_cost = 3;          // 总成本（汇总）
+  repeated UsageStats Stats = 1;  // 统计数据列表
+  int64 TotalRequests = 2;       // 总请求数（汇总）
+  double TotalCost = 3;          // 总成本（汇总）
 }
 
 // GetHealthRequest 获取健康状态请求
@@ -149,52 +149,52 @@ message GetHealthRequest {
 
 // ComponentHealth 组件健康状态
 message ComponentHealth {
-  string name = 1;              // 组件名称（mysql, redis, accounts）
-  HealthStatus status = 2;      // 健康状态
-  string message = 3;           // 状态消息
-  int32 response_time_ms = 4;   // 响应时间（毫秒）
+  string Name = 1;              // 组件名称（mysql, redis, accounts）
+  HealthStatus Status = 2;      // 健康状态
+  string Message = 3;           // 状态消息
+  int32 ResponseTimeMs = 4;   // 响应时间（毫秒）
 }
 
 // HealthData 健康数据
 message HealthData {
-  HealthStatus overall_status = 1;              // 整体健康状态
-  repeated ComponentHealth components = 2;      // 组件健康状态列表
-  int64 uptime_seconds = 3;                     // 运行时长（秒）
-  double error_rate = 4;                        // 错误率（百分比）
-  google.protobuf.Timestamp checked_at = 5;     // 检查时间
+  HealthStatus OverallStatus = 1;              // 整体健康状态
+  repeated ComponentHealth Components = 2;      // 组件健康状态列表
+  int64 UptimeSeconds = 3;                     // 运行时长（秒）
+  double ErrorRate = 4;                        // 错误率（百分比）
+  google.protobuf.Timestamp CheckedAt = 5;     // 检查时间
 }
 
 // GetHealthResponse 获取健康状态响应
 message GetHealthResponse {
-  HealthData health = 1;  // 健康数据
+  HealthData Health = 1;  // 健康数据
 }
 
 // GetLogsRequest 查询系统日志请求
 message GetLogsRequest {
-  optional LogLevel level = 1;   // 按日志级别过滤（可选）
-  optional string service = 2;   // 按服务名过滤（可选）
-  optional string trace_id = 3;  // 按追踪ID过滤（可选）
-  optional string keyword = 4;   // 关键词搜索（可选）
-  google.protobuf.Timestamp start_time = 5;  // 开始时间（必填）
-  google.protobuf.Timestamp end_time = 6;    // 结束时间（必填）
-  int32 page = 7 [(validate.rules).int32 = {gte: 1}];        // 页码（从1开始）
-  int32 page_size = 8 [(validate.rules).int32 = {gte: 1, lte: 1000}];  // 每页数量（1-1000）
+  optional LogLevel Level = 1;   // 按日志级别过滤（可选）
+  optional string Service = 2;   // 按服务名过滤（可选）
+  optional string TraceId = 3;  // 按追踪ID过滤（可选）
+  optional string Keyword = 4;   // 关键词搜索（可选）
+  google.protobuf.Timestamp StartTime = 5;  // 开始时间（必填）
+  google.protobuf.Timestamp EndTime = 6;    // 结束时间（必填）
+  int32 Page = 7 [(validate.rules).int32 = {gte: 1}];        // 页码（从1开始）
+  int32 PageSize = 8 [(validate.rules).int32 = {gte: 1, lte: 1000}];  // 每页数量（1-1000）
 }
 
 // LogEntry 日志条目
 message LogEntry {
-  google.protobuf.Timestamp timestamp = 1;  // 时间戳
-  LogLevel level = 2;                       // 日志级别
-  string message = 3;                       // 日志消息
-  string service = 4;                       // 服务名
-  string trace_id = 5;                      // 追踪ID
-  map<string, string> fields = 6;           // 额外字段（如 user_id, account_id）
+  google.protobuf.Timestamp Timestamp = 1;  // 时间戳
+  LogLevel Level = 2;                       // 日志级别
+  string Message = 3;                       // 日志消息
+  string Service = 4;                       // 服务名
+  string TraceId = 5;                      // 追踪ID
+  map<string, string> Fields = 6;           // 额外字段（如 user_id, account_id）
 }
 
 // GetLogsResponse 查询系统日志响应
 message GetLogsResponse {
-  repeated LogEntry logs = 1;  // 日志列表
-  int32 total = 2;             // 总数量
-  int32 page = 3;              // 当前页码
-  int32 page_size = 4;         // 每页数量
+  repeated LogEntry Logs = 1;  // 日志列表
+  int32 Total = 2;             // 总数量
+  int32 Page = 3;              // 当前页码
+  int32 PageSize = 4;         // 每页数量
 }

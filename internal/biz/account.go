@@ -8,6 +8,7 @@ import (
 	"QuotaLane/internal/data"
 	"QuotaLane/pkg/crypto"
 	"QuotaLane/pkg/oauth"
+	pkgoauth "QuotaLane/pkg/oauth" // 统一 OAuth Manager
 	"QuotaLane/pkg/openai"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -20,17 +21,19 @@ type AccountUsecase struct {
 	crypto        *crypto.AESCrypto
 	oauth         oauth.OAuthService
 	openaiService openai.OpenAIService
+	oauthManager  *pkgoauth.OAuthManager // 统一 OAuth Manager
 	rdb           *redis.Client
 	logger        *log.Helper
 }
 
 // NewAccountUsecase creates a new account usecase.
-func NewAccountUsecase(repo data.AccountRepo, crypto *crypto.AESCrypto, oauth oauth.OAuthService, openaiService openai.OpenAIService, rdb *redis.Client, logger log.Logger) *AccountUsecase {
+func NewAccountUsecase(repo data.AccountRepo, crypto *crypto.AESCrypto, oauth oauth.OAuthService, openaiService openai.OpenAIService, oauthManager *pkgoauth.OAuthManager, rdb *redis.Client, logger log.Logger) *AccountUsecase {
 	return &AccountUsecase{
 		repo:          repo,
 		crypto:        crypto,
 		oauth:         oauth,
 		openaiService: openaiService,
+		oauthManager:  oauthManager,
 		rdb:           rdb,
 		logger:        log.NewHelper(logger),
 	}
@@ -77,13 +80,13 @@ func (uc *AccountUsecase) CreateAccount(ctx context.Context, req *v1.CreateAccou
 	}
 
 	// Encrypt OAuth Data if provided (for CLAUDE_CONSOLE)
-	if req.OauthData != "" {
+	if req.OAuthData != "" {
 		// Validate OAuth data is valid JSON
-		if err := data.ValidateMetadataJSON(req.OauthData); err != nil {
+		if err := data.ValidateMetadataJSON(req.OAuthData); err != nil {
 			return nil, fmt.Errorf("invalid OAuth data format: %w", err)
 		}
 
-		encrypted, err := uc.crypto.Encrypt(req.OauthData)
+		encrypted, err := uc.crypto.Encrypt(req.OAuthData)
 		if err != nil {
 			uc.logger.Errorf("failed to encrypt OAuth data: %v", err)
 			return nil, fmt.Errorf("failed to encrypt credentials")
@@ -195,13 +198,13 @@ func (uc *AccountUsecase) UpdateAccount(ctx context.Context, req *v1.UpdateAccou
 	}
 
 	// Update OAuth Data if provided
-	if req.OauthData != nil && *req.OauthData != "" {
+	if req.OAuthData != nil && *req.OAuthData != "" {
 		// Validate OAuth data is valid JSON
-		if err := data.ValidateMetadataJSON(*req.OauthData); err != nil {
+		if err := data.ValidateMetadataJSON(*req.OAuthData); err != nil {
 			return nil, fmt.Errorf("invalid OAuth data format: %w", err)
 		}
 
-		encrypted, err := uc.crypto.Encrypt(*req.OauthData)
+		encrypted, err := uc.crypto.Encrypt(*req.OAuthData)
 		if err != nil {
 			uc.logger.Errorf("failed to encrypt OAuth data: %v", err)
 			return nil, fmt.Errorf("failed to encrypt credentials")
@@ -248,7 +251,7 @@ func (uc *AccountUsecase) maskSensitiveFields(account *v1.Account) {
 	}
 
 	// Mask OAuth Data: replace with placeholder
-	if account.OauthDataEncrypted != "" {
-		account.OauthDataEncrypted = "[ENCRYPTED]"
+	if account.OAuthDataEncrypted != "" {
+		account.OAuthDataEncrypted = "[ENCRYPTED]"
 	}
 }
