@@ -1,6 +1,8 @@
 # golangci-lint configuration for Kratos project
-# Compatible with golangci-lint v1.64.x (used in CI)
+# Compatible with golangci-lint v2.x
 # See: https://golangci-lint.run/usage/configuration/
+
+version: 2
 
 run:
   timeout: 5m
@@ -18,15 +20,20 @@ linters:
     - misspell
     - revive
     - gosec
+
+formatters:
+  enable:
     - gofmt
     - goimports
 
-linters-settings:
+formatters-settings:
   gofmt:
     simplify: true
 
   goimports:
     local-prefixes: QuotaLane
+
+linters-settings:
 
   govet:
     settings:

@@ -1,3 +1,4 @@
+// Package providers implements OAuth provider abstractions and implementations.
 package providers
 
 import (
@@ -84,7 +85,7 @@ func (b *BaseProvider) DoJSONRequest(
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// 读取响应体
 	respData, err := io.ReadAll(resp.Body)
@@ -165,7 +166,7 @@ func (b *BaseProvider) DoFormRequest(
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// 读取响应体
 	respData, err := io.ReadAll(resp.Body)
