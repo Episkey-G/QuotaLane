@@ -2,19 +2,16 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	v1 "QuotaLane/api/v1"
 	"QuotaLane/internal/biz"
 	"QuotaLane/internal/service/oauth"
-	pkgerrors "QuotaLane/pkg/errors"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // AccountService implements the AccountService gRPC interface.
@@ -39,60 +36,6 @@ func NewAccountService(uc *biz.AccountUsecase, logger log.Logger) *AccountServic
 		uc:            uc,
 		oauthRegistry: registry,
 		logger:        log.NewHelper(logger),
-	}
-}
-
-// mapDBErrorToGRPCStatus converts a database error to a gRPC status error.
-// This provides consistent error responses to clients with appropriate gRPC codes.
-//
-// Mapping:
-//   - ErrorTypeDuplicateKey → codes.AlreadyExists (409 HTTP equivalent)
-//   - ErrorTypeInvalidJSON → codes.InvalidArgument (400 HTTP equivalent)
-//   - ErrorTypeInvalidValue → codes.InvalidArgument (400 HTTP equivalent)
-//   - ErrorTypeConstraintViolation → codes.FailedPrecondition (412 HTTP equivalent)
-//   - ErrorTypeNotFound → codes.NotFound (404 HTTP equivalent)
-//   - ErrorTypeDeadlock → codes.Aborted (409 HTTP equivalent)
-//   - ErrorTypeConnectionError → codes.Unavailable (503 HTTP equivalent)
-//   - ErrorTypeUnknown → codes.Internal (500 HTTP equivalent)
-func mapDBErrorToGRPCStatus(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	// Try to unwrap to get the database error
-	var dbErr *pkgerrors.DatabaseError
-	if !errors.As(err, &dbErr) {
-		// Not a classified database error, return as internal error
-		return status.Error(codes.Internal, err.Error())
-	}
-
-	switch dbErr.Type {
-	case pkgerrors.ErrorTypeDuplicateKey:
-		return status.Error(codes.AlreadyExists, "resource already exists (duplicate key)")
-
-	case pkgerrors.ErrorTypeInvalidJSON:
-		return status.Error(codes.InvalidArgument, "invalid JSON data in request")
-
-	case pkgerrors.ErrorTypeInvalidValue:
-		return status.Error(codes.InvalidArgument, "invalid value in request")
-
-	case pkgerrors.ErrorTypeDataTooLong:
-		return status.Error(codes.InvalidArgument, "data too long for field")
-
-	case pkgerrors.ErrorTypeConstraintViolation:
-		return status.Error(codes.FailedPrecondition, "constraint violation")
-
-	case pkgerrors.ErrorTypeNotFound:
-		return status.Error(codes.NotFound, "resource not found")
-
-	case pkgerrors.ErrorTypeDeadlock:
-		return status.Error(codes.Aborted, "operation aborted due to deadlock, please retry")
-
-	case pkgerrors.ErrorTypeConnectionError:
-		return status.Error(codes.Unavailable, "database connection error, please try again later")
-
-	default:
-		return status.Error(codes.Internal, "internal database error")
 	}
 }
 
@@ -271,6 +214,12 @@ func (s *AccountService) TestAccount(ctx context.Context, req *v1.TestAccountReq
 	// 计算响应时间
 	responseTimeMs := time.Since(startTime).Milliseconds()
 
+	// 安全转换 int64 to int32，防止溢出
+	responseTimeMsInt32 := int32(responseTimeMs)
+	if responseTimeMs > 2147483647 { // int32 max value
+		responseTimeMsInt32 = 2147483647 // Cap at max int32 value
+	}
+
 	// 脱敏 API Key 和 Base API（前 8 位 + ****）
 	if updatedAccount.ApiKeyEncrypted != "" && len(updatedAccount.ApiKeyEncrypted) > 8 {
 		updatedAccount.ApiKeyEncrypted = updatedAccount.ApiKeyEncrypted[:8] + "****"
@@ -286,16 +235,8 @@ func (s *AccountService) TestAccount(ctx context.Context, req *v1.TestAccountReq
 		Success:        testErr == nil,
 		Message:        message,
 		HealthScore:    updatedAccount.HealthScore,
-		ResponseTimeMs: int32(responseTimeMs),
+		ResponseTimeMs: responseTimeMsInt32,
 	}, nil
-}
-
-// timestampProto 将 *time.Time 转换为 *timestamppb.Timestamp
-func timestampProto(t *time.Time) *timestamppb.Timestamp {
-	if t == nil {
-		return nil
-	}
-	return timestamppb.New(*t)
 }
 
 // ========== 统一 OAuth 授权流程 RPC 实现 ==========
