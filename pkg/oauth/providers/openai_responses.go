@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	// OpenAI Responses 验证超时
+	// OpenAIResponsesTimeout is the timeout for OpenAI Responses API key validation.
 	OpenAIResponsesTimeout = 30 * time.Second
 )
 

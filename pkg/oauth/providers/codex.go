@@ -17,19 +17,25 @@ import (
 )
 
 const (
-	// Codex CLI OAuth 配置
-	CodexAuthorizeURL  = "https://auth.openai.com/oauth/authorize"
-	CodexTokenURL      = "https://auth.openai.com/oauth/token"
-	CodexClientID      = "app_EMoamEEZ73f0CkXaXp7hrann"
-	CodexRedirectURI   = "http://localhost:1455/auth/callback"
-	CodexScopes        = "openid profile email offline_access"
-	CodexScopesRefresh = "openid profile email" // 刷新时不包含 offline_access
+	// CodexAuthorizeURL is the Codex CLI OAuth authorization endpoint.
+	CodexAuthorizeURL = "https://auth.openai.com/oauth/authorize"
+	// CodexTokenURL is the Codex CLI OAuth token endpoint.
+	CodexTokenURL = "https://auth.openai.com/oauth/token"
+	// CodexClientID is the Codex CLI OAuth client ID.
+	CodexClientID = "app_EMoamEEZ73f0CkXaXp7hrann"
+	// CodexRedirectURI is the Codex CLI OAuth redirect URI.
+	CodexRedirectURI = "http://localhost:1455/auth/callback"
+	// CodexScopes is the default OAuth scopes for Codex CLI.
+	CodexScopes = "openid profile email offline_access"
+	// CodexScopesRefresh is the OAuth scopes for token refresh (excludes offline_access).
+	CodexScopesRefresh = "openid profile email"
 
-	// PKCE 参数（⚠️ Codex 与 Claude 长度不同）
-	CodexPKCESize     = 64 // 64 字节 → hex 编码（128 字符）
+	// CodexPKCESize is the PKCE code verifier size (64 bytes → 128 chars hex, differs from Claude).
+	CodexPKCESize = 64
+	// CodexPKCEEncoding is the PKCE code verifier encoding method.
 	CodexPKCEEncoding = "hex"
 
-	// 超时设置
+	// CodexTokenTimeout is the timeout for Codex token requests.
 	CodexTokenTimeout = 10 * time.Minute
 )
 

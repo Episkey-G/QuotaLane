@@ -15,19 +15,25 @@ import (
 )
 
 const (
-	// Claude OAuth 配置（从 Node.js 版本提取）
+	// ClaudeAuthorizeURL is the Claude OAuth authorization endpoint.
 	ClaudeAuthorizeURL = "https://claude.ai/oauth/authorize"
-	ClaudeTokenURL     = "https://console.anthropic.com/v1/oauth/token"
-	ClaudeClientID     = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
-	ClaudeRedirectURI  = "https://console.anthropic.com/oauth/code/callback"
-	ClaudeScopes       = "org:create_api_key user:profile user:inference"
-	ClaudeUserAgent    = "claude-cli/1.0.56 (external, cli)"
+	// ClaudeTokenURL is the Claude OAuth token endpoint.
+	ClaudeTokenURL = "https://console.anthropic.com/v1/oauth/token"
+	// ClaudeClientID is the Claude OAuth client ID.
+	ClaudeClientID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+	// ClaudeRedirectURI is the Claude OAuth redirect URI.
+	ClaudeRedirectURI = "https://console.anthropic.com/oauth/code/callback"
+	// ClaudeScopes is the default OAuth scopes for Claude.
+	ClaudeScopes = "org:create_api_key user:profile user:inference"
+	// ClaudeUserAgent is the User-Agent header for Claude requests.
+	ClaudeUserAgent = "claude-cli/1.0.56 (external, cli)"
 
-	// PKCE 参数
-	ClaudePKCESize     = 32 // 32 字节 → base64url 编码（约 43 字符）
+	// ClaudePKCESize is the PKCE code verifier size (32 bytes → ~43 chars base64url).
+	ClaudePKCESize = 32
+	// ClaudePKCEEncoding is the PKCE code verifier encoding method.
 	ClaudePKCEEncoding = "base64url"
 
-	// 超时设置
+	// ClaudeTokenTimeout is the timeout for Claude token requests.
 	ClaudeTokenTimeout = 10 * time.Minute
 )
 
