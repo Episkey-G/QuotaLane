@@ -10,6 +10,7 @@ import (
 	"time"
 
 	v1 "QuotaLane/api/v1"
+	pkgerrors "QuotaLane/pkg/errors"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -28,6 +29,7 @@ const (
 	ProviderDroid           AccountProvider = "droid"
 	ProviderGemini          AccountProvider = "gemini"
 	ProviderOpenAIResponses AccountProvider = "openai-responses"
+	ProviderCodexCLI        AccountProvider = "codex-cli"
 	ProviderAzureOpenAI     AccountProvider = "azure-openai"
 )
 
@@ -36,6 +38,7 @@ type AccountStatus string
 
 // Account status constants representing the current state of an account.
 const (
+	StatusCreated  AccountStatus = "created" // 账户已创建但未验证
 	StatusActive   AccountStatus = "active"
 	StatusInactive AccountStatus = "inactive"
 	StatusError    AccountStatus = "error"
@@ -45,18 +48,29 @@ const (
 type Account struct {
 	ID                 int64           `gorm:"primaryKey;column:id"`
 	Name               string          `gorm:"column:name;size:100;not null"`
-	Provider           AccountProvider `gorm:"column:provider;type:enum('claude-official','claude-console','bedrock','ccr','droid','gemini','openai-responses','azure-openai');not null"`
+	Description        string          `gorm:"column:description;type:text"`
+	Provider           AccountProvider `gorm:"column:provider;type:enum('claude-official','claude-console','bedrock','ccr','droid','gemini','openai-responses','codex-cli','azure-openai');not null"`
 	APIKeyEncrypted    string          `gorm:"column:api_key_encrypted;type:text"`
+	BaseAPI            string          `gorm:"column:base_api;size:255"` // OpenAI Responses 等服务的 API 基础地址
 	OAuthDataEncrypted string          `gorm:"column:oauth_data_encrypted;type:text"`
 	OAuthExpiresAt     *time.Time      `gorm:"column:oauth_expires_at"` // OAuth Token 过期时间（可为 NULL）
-	RpmLimit           int32           `gorm:"column:rpm_limit;default:0;not null"`
-	TpmLimit           int32           `gorm:"column:tpm_limit;default:0;not null"`
-	HealthScore        int32           `gorm:"column:health_score;default:100;not null"`
-	IsCircuitBroken    bool            `gorm:"column:is_circuit_broken;default:false;not null"`
-	Status             AccountStatus   `gorm:"column:status;type:enum('active','inactive','error');default:'active';not null"`
-	Metadata           string          `gorm:"column:metadata;type:json"` // JSON string
-	CreatedAt          time.Time       `gorm:"column:created_at;autoCreateTime"`
-	UpdatedAt          time.Time       `gorm:"column:updated_at;autoUpdateTime"`
+	// Codex CLI OAuth 相关字段
+	AccessTokenEncrypted  string        `gorm:"column:access_token_encrypted;type:varchar(1024)"`
+	RefreshTokenEncrypted string        `gorm:"column:refresh_token_encrypted;type:varchar(1024)"`
+	TokenExpiresAt        *time.Time    `gorm:"column:token_expires_at"`
+	IDTokenEncrypted      string        `gorm:"column:id_token_encrypted;type:varchar(2048)"`
+	Organizations         string        `gorm:"column:organizations;type:text"` // JSON array
+	RpmLimit              int32         `gorm:"column:rpm_limit;default:0;not null"`
+	TpmLimit              int32         `gorm:"column:tpm_limit;default:0;not null"`
+	HealthScore           int32         `gorm:"column:health_score;default:100;not null"`
+	IsCircuitBroken       bool          `gorm:"column:is_circuit_broken;default:false;not null"`
+	Status                AccountStatus `gorm:"column:status;type:enum('created','active','inactive','error');default:'active';not null"`
+	Metadata              *string       `gorm:"column:metadata;type:json"`                    // JSON string (pointer for NULL support)
+	LastError             *string       `gorm:"column:last_error;type:text"`                  // 最后一次错误信息（JSON，pointer for NULL support）
+	LastErrorAt           *time.Time    `gorm:"column:last_error_at"`                         // 最后一次错误发生时间
+	ConsecutiveErrors     int32         `gorm:"column:consecutive_errors;default:0;not null"` // 连续失败次数
+	CreatedAt             time.Time     `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt             time.Time     `gorm:"column:updated_at;autoUpdateTime"`
 }
 
 // TableName specifies the table name for GORM.
@@ -186,6 +200,12 @@ func StatusFromProto(s v1.AccountStatus) AccountStatus {
 
 // ToProto converts GORM Account model to Proto Account message.
 func (a *Account) ToProto() *v1.Account {
+	// Handle Metadata pointer - convert to string
+	var metadataStr string
+	if a.Metadata != nil {
+		metadataStr = *a.Metadata
+	}
+
 	proto := &v1.Account{
 		Id:                 a.ID,
 		Name:               a.Name,
@@ -197,7 +217,7 @@ func (a *Account) ToProto() *v1.Account {
 		HealthScore:        a.HealthScore,
 		IsCircuitBroken:    a.IsCircuitBroken,
 		Status:             StatusToProto(a.Status),
-		Metadata:           a.Metadata,
+		Metadata:           metadataStr,
 		CreatedAt:          timestamppb.New(a.CreatedAt),
 		UpdatedAt:          timestamppb.New(a.UpdatedAt),
 	}
@@ -235,6 +255,8 @@ type AccountRepo interface {
 	UpdateAccount(ctx context.Context, account *Account) error
 	DeleteAccount(ctx context.Context, id int64) error
 	ListExpiringAccounts(ctx context.Context, expiryThreshold time.Time) ([]*Account, error)
+	ListAccountsByProvider(ctx context.Context, provider AccountProvider, status AccountStatus) ([]*Account, error)
+	ListCodexCLIAccountsNeedingRefresh(ctx context.Context) ([]*Account, error)
 	UpdateOAuthData(ctx context.Context, accountID int64, oauthData string, expiresAt time.Time) error
 	UpdateHealthScore(ctx context.Context, accountID int64, score int32) error
 	UpdateAccountStatus(ctx context.Context, accountID int64, status AccountStatus) error
@@ -267,10 +289,35 @@ func NewAccountRepo(data *Data, db *gorm.DB, logger log.Logger) AccountRepo {
 }
 
 // CreateAccount creates a new account in the database.
+// Returns classified database errors for better error handling in upper layers.
 func (r *accountRepo) CreateAccount(ctx context.Context, account *Account) error {
 	if err := r.db.WithContext(ctx).Create(account).Error; err != nil {
-		r.logger.Errorf("failed to create account: %v", err)
-		return fmt.Errorf("failed to create account: %w", err)
+		// Classify the database error for better error handling
+		dbErr := pkgerrors.ClassifyDBError(err)
+
+		// Log with appropriate level based on error type
+		switch dbErr.Type {
+		case pkgerrors.ErrorTypeDuplicateKey:
+			r.logger.Warnw("duplicate account name",
+				"name", account.Name,
+				"provider", account.Provider,
+				"error", dbErr.Error())
+		case pkgerrors.ErrorTypeInvalidJSON:
+			r.logger.Errorw("invalid JSON in account metadata",
+				"name", account.Name,
+				"metadata", account.Metadata,
+				"error", dbErr.Error())
+		case pkgerrors.ErrorTypeConnectionError:
+			r.logger.Errorw("database connection error",
+				"error", dbErr.Error())
+		default:
+			r.logger.Errorw("failed to create account",
+				"name", account.Name,
+				"error", dbErr.Error())
+		}
+
+		// Return the classified error
+		return dbErr
 	}
 
 	r.logger.Infow("account created", "id", account.ID, "name", account.Name, "provider", account.Provider)
@@ -428,9 +475,10 @@ func MaskAPIKey(apiKey string) string {
 }
 
 // ValidateMetadataJSON validates if metadata is valid JSON.
+// Empty string is NOT allowed - use NULL (nil pointer) instead for database storage.
 func ValidateMetadataJSON(metadata string) error {
 	if metadata == "" {
-		return nil // Empty metadata is valid
+		return fmt.Errorf("metadata cannot be empty string, use null (nil pointer) or valid JSON")
 	}
 	var js json.RawMessage
 	if err := json.Unmarshal([]byte(metadata), &js); err != nil {
@@ -567,4 +615,53 @@ func (r *accountRepo) UpdateAccountStatus(ctx context.Context, accountID int64, 
 
 	r.logger.Infow("account status updated", "account_id", accountID, "status", status)
 	return nil
+}
+
+// ListAccountsByProvider 查询指定 Provider 类型和状态的所有账户
+// provider: Provider 类型（如 ProviderOpenAIResponses）
+// status: 账户状态（如 StatusActive）
+// 返回符合条件的账户列表（按 ID 升序排列）
+func (r *accountRepo) ListAccountsByProvider(ctx context.Context, provider AccountProvider, status AccountStatus) ([]*Account, error) {
+	var accounts []*Account
+
+	// SQL: SELECT * FROM api_accounts
+	//      WHERE provider = ?
+	//      AND status = ?
+	//      ORDER BY id ASC
+	err := r.db.WithContext(ctx).
+		Where("provider = ?", provider).
+		Where("status = ?", status).
+		Order("id ASC").
+		Find(&accounts).Error
+
+	if err != nil {
+		r.logger.Errorf("failed to list accounts by provider: %v", err)
+		return nil, fmt.Errorf("failed to list accounts by provider: %w", err)
+	}
+
+	r.logger.Infow("accounts listed by provider", "provider", provider, "status", status, "count", len(accounts))
+	return accounts, nil
+}
+
+// ListCodexCLIAccountsNeedingRefresh 查询需要刷新 token 的 Codex CLI 账户
+// 查询条件：provider='codex-cli' AND status='active' AND token_expires_at < now() + 5分钟
+func (r *accountRepo) ListCodexCLIAccountsNeedingRefresh(ctx context.Context) ([]*Account, error) {
+	var accounts []*Account
+
+	// Token 即将在 5 分钟内过期
+	threshold := time.Now().Add(5 * time.Minute)
+
+	err := r.db.WithContext(ctx).
+		Where("provider = ? AND status = ? AND token_expires_at < ?",
+			ProviderCodexCLI, StatusActive, threshold).
+		Order("token_expires_at ASC").
+		Find(&accounts).Error
+
+	if err != nil {
+		r.logger.Errorf("failed to list Codex CLI accounts needing refresh: %v", err)
+		return nil, fmt.Errorf("failed to list Codex CLI accounts needing refresh: %w", err)
+	}
+
+	r.logger.Infow("Codex CLI accounts needing refresh", "count", len(accounts), "threshold", threshold)
+	return accounts, nil
 }

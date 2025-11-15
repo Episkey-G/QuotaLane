@@ -79,9 +79,9 @@ func (uc *AccountUsecase) RefreshClaudeToken(ctx context.Context, accountID int6
 
 	// 从 metadata 读取 proxy_url（可选）
 	var proxyURL string
-	if account.Metadata != "" {
+	if account.Metadata != nil && *account.Metadata != "" {
 		var metadata map[string]interface{}
-		if err := json.Unmarshal([]byte(account.Metadata), &metadata); err == nil {
+		if err := json.Unmarshal([]byte(*account.Metadata), &metadata); err == nil {
 			if proxy, ok := metadata["proxy_url"].(string); ok {
 				proxyURL = proxy
 			}

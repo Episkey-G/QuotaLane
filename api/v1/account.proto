@@ -63,6 +63,24 @@ service AccountService {
       body: "*"
     };
   }
+
+  // ========== Codex CLI OAuth 授权流程 ==========
+
+  // GenerateOpenAIAuthURL 生成 OpenAI OAuth 授权链接
+  rpc GenerateOpenAIAuthURL(GenerateOpenAIAuthURLRequest) returns (GenerateOpenAIAuthURLResponse) {
+    option (google.api.http) = {
+      post: "/v1/accounts/openai/generate-auth-url"
+      body: "*"
+    };
+  }
+
+  // ExchangeOpenAICode 交换 OpenAI OAuth 授权码并创建账户
+  rpc ExchangeOpenAICode(ExchangeOpenAICodeRequest) returns (ExchangeOpenAICodeResponse) {
+    option (google.api.http) = {
+      post: "/v1/accounts/openai/exchange-code"
+      body: "*"
+    };
+  }
 }
 
 // AccountProvider AI服务提供商枚举
@@ -76,6 +94,7 @@ enum AccountProvider {
   GEMINI = 6;                // Google Gemini
   OPENAI_RESPONSES = 7;      // OpenAI Responses (Codex)
   AZURE_OPENAI = 8;          // Azure OpenAI
+  CODEX_CLI = 9;             // Codex CLI (OAuth)
 }
 
 // AccountStatus 账户状态枚举
@@ -84,6 +103,7 @@ enum AccountStatus {
   ACCOUNT_ACTIVE = 1;     // 活跃状态
   ACCOUNT_INACTIVE = 2;   // 未激活
   ACCOUNT_ERROR = 3;      // 错误状态
+  ACCOUNT_CREATED = 4;    // 已创建但未验证（用于 OAuth 流程）
 }
 
 // Account 账号信息
@@ -197,4 +217,38 @@ message TestAccountResponse {
   string message = 2;         // 测试结果消息
   int32 health_score = 3;     // 健康分数（0-100）
   int32 response_time_ms = 4; // 响应时间（毫秒）
+}
+
+// ========== Codex CLI OAuth 授权流程 ==========
+
+// GenerateOpenAIAuthURLRequest 生成 OpenAI OAuth 授权链接请求
+message GenerateOpenAIAuthURLRequest {
+  optional string proxy_url = 1;  // 代理 URL（SOCKS5/HTTP）（可选）
+}
+
+// GenerateOpenAIAuthURLResponse 生成 OpenAI OAuth 授权链接响应
+message GenerateOpenAIAuthURLResponse {
+  string auth_url = 1;    // OAuth 授权链接
+  string session_id = 2;  // 会话 ID（用于后续 code 交换）
+  string state = 3;       // CSRF 防护 state 参数（前端验证用）
+}
+
+// ExchangeOpenAICodeRequest 交换 OpenAI OAuth 授权码请求
+message ExchangeOpenAICodeRequest {
+  string session_id = 1 [(validate.rules).string = {min_len: 1}];  // 会话 ID（必填）
+  string code = 2 [(validate.rules).string = {min_len: 1}];        // 授权码（必填）
+  string name = 3 [(validate.rules).string = {min_len: 1, max_len: 100}];  // 账户名称（必填）
+  optional string description = 4 [(validate.rules).string = {max_len: 500}];  // 账户描述（可选）
+  optional int32 rpm_limit = 5 [(validate.rules).int32 = {gte: 0}];  // RPM 限制（可选）
+  optional int32 tpm_limit = 6 [(validate.rules).int32 = {gte: 0}];  // TPM 限制（可选）
+  optional string metadata = 7;  // 扩展元数据（JSON格式）（可选）
+}
+
+// ExchangeOpenAICodeResponse 交换 OpenAI OAuth 授权码响应
+message ExchangeOpenAICodeResponse {
+  int64 account_id = 1;       // 创建的账户 ID
+  string account_name = 2;    // 账户名称
+  AccountStatus status = 3;   // 账户状态
+  string message = 4;         // 提示信息
+  google.protobuf.Timestamp token_expires_at = 5;  // Access token 过期时间
 }

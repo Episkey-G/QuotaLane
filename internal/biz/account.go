@@ -8,6 +8,7 @@ import (
 	"QuotaLane/internal/data"
 	"QuotaLane/pkg/crypto"
 	"QuotaLane/pkg/oauth"
+	"QuotaLane/pkg/openai"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/redis/go-redis/v9"
@@ -15,21 +16,23 @@ import (
 
 // AccountUsecase implements account business logic.
 type AccountUsecase struct {
-	repo   data.AccountRepo
-	crypto *crypto.AESCrypto
-	oauth  oauth.OAuthService
-	rdb    *redis.Client
-	logger *log.Helper
+	repo          data.AccountRepo
+	crypto        *crypto.AESCrypto
+	oauth         oauth.OAuthService
+	openaiService openai.OpenAIService
+	rdb           *redis.Client
+	logger        *log.Helper
 }
 
 // NewAccountUsecase creates a new account usecase.
-func NewAccountUsecase(repo data.AccountRepo, crypto *crypto.AESCrypto, oauth oauth.OAuthService, rdb *redis.Client, logger log.Logger) *AccountUsecase {
+func NewAccountUsecase(repo data.AccountRepo, crypto *crypto.AESCrypto, oauth oauth.OAuthService, openaiService openai.OpenAIService, rdb *redis.Client, logger log.Logger) *AccountUsecase {
 	return &AccountUsecase{
-		repo:   repo,
-		crypto: crypto,
-		oauth:  oauth,
-		rdb:    rdb,
-		logger: log.NewHelper(logger),
+		repo:          repo,
+		crypto:        crypto,
+		oauth:         oauth,
+		openaiService: openaiService,
+		rdb:           rdb,
+		logger:        log.NewHelper(logger),
 	}
 }
 
@@ -42,11 +45,13 @@ func (uc *AccountUsecase) CreateAccount(ctx context.Context, req *v1.CreateAccou
 			req.Provider)
 	}
 
-	// Validate metadata JSON if provided
+	// Validate and prepare metadata
+	var metadataPtr *string
 	if req.Metadata != "" {
 		if err := data.ValidateMetadataJSON(req.Metadata); err != nil {
 			return nil, fmt.Errorf("invalid metadata: %w", err)
 		}
+		metadataPtr = &req.Metadata
 	}
 
 	// Create account model
@@ -58,7 +63,7 @@ func (uc *AccountUsecase) CreateAccount(ctx context.Context, req *v1.CreateAccou
 		HealthScore:     100, // Initial health score
 		IsCircuitBroken: false,
 		Status:          data.StatusActive,
-		Metadata:        req.Metadata,
+		Metadata:        metadataPtr,
 	}
 
 	// Encrypt API Key if provided (for OPENAI_RESPONSES)
@@ -176,7 +181,7 @@ func (uc *AccountUsecase) UpdateAccount(ctx context.Context, req *v1.UpdateAccou
 		if err := data.ValidateMetadataJSON(*req.Metadata); err != nil {
 			return nil, fmt.Errorf("invalid metadata: %w", err)
 		}
-		account.Metadata = *req.Metadata
+		account.Metadata = req.Metadata
 	}
 
 	// Update API Key if provided

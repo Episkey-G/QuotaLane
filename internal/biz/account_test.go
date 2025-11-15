@@ -10,6 +10,7 @@ import (
 	"QuotaLane/internal/data"
 	"QuotaLane/pkg/crypto"
 	"QuotaLane/pkg/oauth"
+	"QuotaLane/pkg/openai"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/redis/go-redis/v9"
@@ -76,6 +77,14 @@ func (m *MockAccountRepo) UpdateAccountStatus(ctx context.Context, accountID int
 	return args.Error(0)
 }
 
+func (m *MockAccountRepo) ListAccountsByProvider(ctx context.Context, provider data.AccountProvider, status data.AccountStatus) ([]*data.Account, error) {
+	args := m.Called(ctx, provider, status)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*data.Account), args.Error(1)
+}
+
 // setupTestUsecase creates a test AccountUsecase with mock dependencies.
 func setupTestUsecase(t *testing.T) (*AccountUsecase, *MockAccountRepo, *crypto.AESCrypto) {
 	mockRepo := new(MockAccountRepo)
@@ -89,10 +98,13 @@ func setupTestUsecase(t *testing.T) (*AccountUsecase, *MockAccountRepo, *crypto.
 	// Create mock OAuth service (nil for unit tests)
 	var oauthSvc oauth.OAuthService = nil
 
+	// Create mock OpenAI service (nil for unit tests)
+	var openaiSvc openai.OpenAIService = nil
+
 	// Create mock Redis client (nil for unit tests)
 	var rdb *redis.Client = nil
 
-	uc := NewAccountUsecase(mockRepo, cryptoSvc, oauthSvc, rdb, logger)
+	uc := NewAccountUsecase(mockRepo, cryptoSvc, oauthSvc, openaiSvc, rdb, logger)
 	return uc, mockRepo, cryptoSvc
 }
 

@@ -139,5 +139,53 @@ func setupCronJobs(accountUC *biz.AccountUsecase, logger log.Logger) *cron.Cron 
 		helper.Fatalf("failed to add OAuth refresh cron job: %v", err)
 	}
 
+	// Add OpenAI Responses health check job (every 10 minutes, offset from OAuth refresh)
+	// Cron format: "2-59/10 * * * *" = at minute 2, 12, 22, 32, 42, 52
+	// This avoids conflict with OAuth refresh (0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55)
+	_, err = c.AddFunc("2-59/10 * * * *", func() {
+		defer func() {
+			if r := recover(); r != nil {
+				helper.Errorf("panic in OpenAI health check cron job: %v", r)
+			}
+		}()
+
+		ctx := context.Background()
+		helper.Info("Starting OpenAI Responses health check cron job")
+
+		if err := accountUC.HealthCheckOpenAIResponsesAccounts(ctx); err != nil {
+			helper.Errorf("OpenAI health check cron job failed: %v", err)
+		} else {
+			helper.Info("OpenAI health check cron job completed successfully")
+		}
+	})
+
+	if err != nil {
+		helper.Fatalf("failed to add OpenAI health check cron job: %v", err)
+	}
+
+	// Add Codex CLI OAuth token refresh job (every 5 minutes, same as Claude OAuth)
+	// Cron format: "*/5 * * * *" = at minute 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
+	// This shares the same schedule as Claude OAuth refresh for simplicity
+	_, err = c.AddFunc("*/5 * * * *", func() {
+		defer func() {
+			if r := recover(); r != nil {
+				helper.Errorf("panic in Codex CLI token refresh cron job: %v", r)
+			}
+		}()
+
+		ctx := context.Background()
+		helper.Info("Starting Codex CLI token refresh cron job")
+
+		if err := accountUC.RefreshCodexCLITokens(ctx); err != nil {
+			helper.Errorf("Codex CLI token refresh cron job failed: %v", err)
+		} else {
+			helper.Info("Codex CLI token refresh cron job completed successfully")
+		}
+	})
+
+	if err != nil {
+		helper.Fatalf("failed to add Codex CLI refresh cron job: %v", err)
+	}
+
 	return c
 }

@@ -15,6 +15,7 @@ import (
 	"QuotaLane/internal/service"
 	"QuotaLane/pkg/crypto"
 	"QuotaLane/pkg/oauth"
+	"QuotaLane/pkg/openai"
 
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
@@ -35,6 +36,7 @@ func wireApp(*conf.Server, *conf.Data, *conf.Auth, log.Logger) (*AppComponents, 
 		service.ProviderSet,
 		server.ProviderSet,
 		oauth.ProviderSet,
+		openai.ProviderSet,
 		newCryptoService,
 		newApp,
 		wire.Struct(new(AppComponents), "*"),

@@ -1,7 +1,9 @@
 package server
 
 import (
+	v1 "QuotaLane/api/v1"
 	"QuotaLane/internal/conf"
+	"QuotaLane/internal/service"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
@@ -9,7 +11,7 @@ import (
 )
 
 // NewHTTPServer new an HTTP server.
-func NewHTTPServer(c *conf.Server, _ log.Logger) *http.Server {
+func NewHTTPServer(c *conf.Server, accountService *service.AccountService, _ log.Logger) *http.Server {
 	var opts = []http.ServerOption{
 		http.Middleware(
 			recovery.Recovery(),
@@ -25,7 +27,9 @@ func NewHTTPServer(c *conf.Server, _ log.Logger) *http.Server {
 		opts = append(opts, http.Timeout(c.Http.Timeout.AsDuration()))
 	}
 	srv := http.NewServer(opts...)
-	// TODO: Register HTTP services here
-	// Example: v1.RegisterAccountServiceHTTPServer(srv, accountService)
+
+	// Register HTTP services
+	v1.RegisterAccountServiceHTTPServer(srv, accountService)
+
 	return srv
 }
