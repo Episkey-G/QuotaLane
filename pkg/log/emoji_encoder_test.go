@@ -197,7 +197,7 @@ func TestEmojiConsoleEncoder_EncodeEntry(t *testing.T) {
 				Message: "Test message",
 			},
 			fields: []zapcore.Field{
-				zapcore.Field{Key: "type", Type: zapcore.StringType, String: "api"},
+				{Key: "type", Type: zapcore.StringType, String: "api"},
 			},
 			shouldHaveEmoji: true,
 			expectedEmoji:   "🔗",
