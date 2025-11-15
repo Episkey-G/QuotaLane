@@ -85,6 +85,14 @@ func (m *MockAccountRepo) ListAccountsByProvider(ctx context.Context, provider d
 	return args.Get(0).([]*data.Account), args.Error(1)
 }
 
+func (m *MockAccountRepo) ListCodexCLIAccountsNeedingRefresh(ctx context.Context, threshold time.Time) ([]*data.Account, error) {
+	args := m.Called(ctx, threshold)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*data.Account), args.Error(1)
+}
+
 // setupTestUsecase creates a test AccountUsecase with mock dependencies.
 func setupTestUsecase(t *testing.T) (*AccountUsecase, *MockAccountRepo, *crypto.AESCrypto) {
 	mockRepo := new(MockAccountRepo)

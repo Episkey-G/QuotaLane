@@ -470,7 +470,7 @@ func TestCreateHTTPClient_SOCKS5WithAuth(t *testing.T) {
 	}
 
 	// 创建 SOCKS5 客户端（带认证）
-	client, err := service.createHTTPClient("socks5://user:pass@localhost:1080")
+	client, err := service.createHTTPClient("socks5://user:pass@localhost:1080", DefaultTimeout)
 
 	// 验证结果
 	assert.NoError(t, err)
@@ -486,7 +486,7 @@ func TestCreateHTTPClient_SOCKS5WithoutAuth(t *testing.T) {
 	}
 
 	// 创建 SOCKS5 客户端（无认证）
-	client, err := service.createHTTPClient("socks5://localhost:1080")
+	client, err := service.createHTTPClient("socks5://localhost:1080", DefaultTimeout)
 
 	// 验证结果
 	assert.NoError(t, err)
@@ -501,7 +501,7 @@ func TestCreateHTTPClient_SOCKS5DefaultPort(t *testing.T) {
 	}
 
 	// 创建 SOCKS5 客户端（无端口，应该使用默认 1080）
-	client, err := service.createHTTPClient("socks5://localhost")
+	client, err := service.createHTTPClient("socks5://localhost", DefaultTimeout)
 
 	// 验证结果
 	assert.NoError(t, err)
