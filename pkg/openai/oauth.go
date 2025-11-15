@@ -164,7 +164,7 @@ func (s *openAIService) ExchangeCode(ctx context.Context, code string, codeVerif
 		log.Printf("[DEBUG] Request failed: %v", err)
 		return nil, fmt.Errorf("failed to exchange code: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// 读取响应
 	body, err := io.ReadAll(resp.Body)
@@ -237,7 +237,7 @@ func (s *openAIService) RefreshToken(ctx context.Context, refreshToken string, p
 			}
 			return nil, lastErr
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		// 读取响应
 		body, err := io.ReadAll(resp.Body)
@@ -327,7 +327,7 @@ func (s *openAIService) ValidateAccessToken(ctx context.Context, baseAPI string,
 			}
 			return lastErr
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		// 检查 HTTP 状态码
 		switch resp.StatusCode {
