@@ -69,7 +69,7 @@ func (r *rateLimitRepo) IncrementRPM(ctx context.Context, accountID int64) (int3
 		count = 2147483647
 	}
 
-	return int32(count), nil
+	return int32(count), nil // #nosec G115 -- overflow is handled above
 }
 
 // GetRPMCount retrieves the current RPM count for an account.
@@ -131,7 +131,7 @@ func (r *rateLimitRepo) IncrementTPM(ctx context.Context, accountID int64, token
 		count = 2147483647
 	}
 
-	return int32(count), nil
+	return int32(count), nil // #nosec G115 -- overflow is handled above
 }
 
 // GetTPMCount retrieves the current TPM count for an account.
@@ -218,7 +218,7 @@ func (r *rateLimitRepo) GetConcurrencyCount(ctx context.Context, accountID int64
 		count = 2147483647
 	}
 
-	return int32(count), nil
+	return int32(count), nil // #nosec G115 -- overflow is handled above
 }
 
 // CleanupExpiredConcurrency removes expired requests from the concurrency tracking sorted set.

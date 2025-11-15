@@ -177,7 +177,7 @@ func (uc *RateLimiterUseCase) EstimateTokens(prompt string, maxOutputTokens int3
 	if promptLen > 2147483647 {
 		promptLen = 2147483647
 	}
-	promptTokens := int32(promptLen)
+	promptTokens := int32(promptLen) // #nosec G115 -- overflow is handled above
 
 	// Add max output tokens
 	estimatedTotal := promptTokens + maxOutputTokens

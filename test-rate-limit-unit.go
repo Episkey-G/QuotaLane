@@ -1,3 +1,4 @@
+// Package main provides a unit test utility for rate limiting functionality.
 package main
 
 import (
