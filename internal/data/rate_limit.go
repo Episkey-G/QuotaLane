@@ -64,6 +64,11 @@ func (r *rateLimitRepo) IncrementRPM(ctx context.Context, accountID int64) (int3
 		}
 	}
 
+	// Prevent overflow when converting int64 to int32
+	if count > 2147483647 {
+		count = 2147483647
+	}
+
 	return int32(count), nil
 }
 
@@ -119,6 +124,11 @@ func (r *rateLimitRepo) IncrementTPM(ctx context.Context, accountID int64, token
 		if err := r.rdb.Expire(ctx, key, 60).Err(); err != nil {
 			r.logger.Warnf("Failed to set TPM expiration for account %d: %v", accountID, err)
 		}
+	}
+
+	// Prevent overflow when converting int64 to int32
+	if count > 2147483647 {
+		count = 2147483647
 	}
 
 	return int32(count), nil
@@ -201,6 +211,11 @@ func (r *rateLimitRepo) GetConcurrencyCount(ctx context.Context, accountID int64
 	count, err := r.rdb.ZCard(ctx, key).Result()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get concurrency count: %w", err)
+	}
+
+	// Prevent overflow when converting int64 to int32
+	if count > 2147483647 {
+		count = 2147483647
 	}
 
 	return int32(count), nil

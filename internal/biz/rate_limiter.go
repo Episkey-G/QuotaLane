@@ -172,7 +172,12 @@ func (uc *RateLimiterUseCase) UpdateTPM(ctx context.Context, accountID int64, ac
 // This is a rough estimation for MVP; more accurate methods (e.g., tiktoken) can be added later.
 func (uc *RateLimiterUseCase) EstimateTokens(prompt string, maxOutputTokens int32) int32 {
 	// Rough estimation: 1 token ≈ 4 characters for English text
-	promptTokens := int32(len(prompt) / 4)
+	// Prevent overflow: cap prompt length calculation
+	promptLen := len(prompt) / 4
+	if promptLen > 2147483647 {
+		promptLen = 2147483647
+	}
+	promptTokens := int32(promptLen)
 
 	// Add max output tokens
 	estimatedTotal := promptTokens + maxOutputTokens

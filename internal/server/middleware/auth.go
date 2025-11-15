@@ -1,3 +1,4 @@
+// Package middleware provides HTTP middleware for authentication, logging, and request processing.
 package middleware
 
 import (
@@ -11,6 +12,16 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/transport"
 	"github.com/go-kratos/kratos/v2/transport/http"
+)
+
+// contextKey is a custom type for context keys to avoid collisions
+type contextKey string
+
+const (
+	// apiKeyContextKey is the context key for storing API key
+	apiKeyContextKey contextKey = "api_key"
+	// apiKeyMaskedContextKey is the context key for storing masked API key
+	apiKeyMaskedContextKey contextKey = "api_key_masked"
 )
 
 // Auth 返回一个 HTTP 认证中间件
@@ -82,8 +93,8 @@ func Auth(logger *pkglog.LogHelper) middleware.Middleware {
 				}
 
 				// 将 API Key 信息注入上下文（供后续处理使用）
-				ctx = context.WithValue(ctx, "api_key", apiKey)
-				ctx = context.WithValue(ctx, "api_key_masked", maskedKey)
+				ctx = context.WithValue(ctx, apiKeyContextKey, apiKey)
+				ctx = context.WithValue(ctx, apiKeyMaskedContextKey, maskedKey)
 
 				// 尝试从已有的 Request Context 中提取信息并更新
 				// 如果 Logging 中间件已经创建了 Request Context，我们可以复用

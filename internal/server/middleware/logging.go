@@ -127,9 +127,3 @@ func extractHTTPStatus(err error) int {
 	}
 	return 200
 }
-
-// generateRequestID 已移至 pkg/log/context.go
-// 此处保留向后兼容性
-func generateRequestID() string {
-	return pkglog.GenerateRequestID()
-}
