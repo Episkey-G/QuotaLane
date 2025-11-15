@@ -269,7 +269,7 @@ func TestAccount_ToProto(t *testing.T) {
 	assert.Equal(t, "Test Account", proto.Name)
 	assert.Equal(t, v1.AccountProvider_CLAUDE_CONSOLE, proto.Provider)
 	assert.Equal(t, "encrypted-api-key", proto.ApiKeyEncrypted)
-	assert.Equal(t, "encrypted-oauth-data", proto.OauthDataEncrypted)
+	assert.Equal(t, "encrypted-oauth-data", proto.OAuthDataEncrypted)
 	assert.Equal(t, int32(50), proto.RpmLimit)
 	assert.Equal(t, int32(100000), proto.TpmLimit)
 	assert.Equal(t, int32(95), proto.HealthScore)

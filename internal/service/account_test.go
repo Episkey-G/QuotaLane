@@ -125,8 +125,11 @@ func setupTestService(t *testing.T) (*AccountService, *MockAccountRepo) {
 	// Create mock OpenAI service (nil for unit tests)
 	var mockOpenAI openai.OpenAIService = nil
 
+	// Create mock OAuth manager (nil for unit tests)
+	var mockOAuthManager *oauth.OAuthManager = nil
+
 	// Create real usecase with mock dependencies
-	uc := biz.NewAccountUsecase(mockRepo, cryptoSvc, mockOAuth, mockOpenAI, rdb, logger)
+	uc := biz.NewAccountUsecase(mockRepo, cryptoSvc, mockOAuth, mockOpenAI, mockOAuthManager, rdb, logger)
 
 	// Create service with real usecase
 	svc := NewAccountService(uc, logger)
