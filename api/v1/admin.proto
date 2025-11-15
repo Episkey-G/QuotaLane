@@ -10,39 +10,45 @@ import "validate/validate.proto";
 
 // AdminService 管理后台服务
 // 提供系统监控、统计、健康检查、日志查询功能
+// 所有操作使用扁平化的路径设计，路径即操作名
 service AdminService {
   // GetDashboard 获取仪表板数据
   rpc GetDashboard(GetDashboardRequest) returns (GetDashboardResponse) {
     option (google.api.http) = {
-      get: "/v1/admin/dashboard"
+      post: "/GetDashboard"
+      body: "*"
     };
   }
 
   // GetMetrics 获取系统指标
   rpc GetMetrics(GetMetricsRequest) returns (GetMetricsResponse) {
     option (google.api.http) = {
-      get: "/v1/admin/metrics"
+      post: "/GetMetrics"
+      body: "*"
     };
   }
 
   // GetUsageStats 获取使用统计
   rpc GetUsageStats(GetUsageStatsRequest) returns (GetUsageStatsResponse) {
     option (google.api.http) = {
-      get: "/v1/admin/usage-stats"
+      post: "/GetUsageStats"
+      body: "*"
     };
   }
 
   // GetHealth 获取健康状态
   rpc GetHealth(GetHealthRequest) returns (GetHealthResponse) {
     option (google.api.http) = {
-      get: "/v1/admin/health"
+      post: "/GetHealth"
+      body: "*"
     };
   }
 
   // GetLogs 查询系统日志
   rpc GetLogs(GetLogsRequest) returns (GetLogsResponse) {
     option (google.api.http) = {
-      get: "/v1/admin/logs"
+      post: "/GetLogs"
+      body: "*"
     };
   }
 }

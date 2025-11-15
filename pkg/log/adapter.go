@@ -35,12 +35,14 @@ func (a *KratosAdapter) Log(level log.Level, keyvals ...interface{}) error {
 			key := fmt.Sprint(keyvals[i])
 			value := keyvals[i+1]
 
-			// Apply sanitization for string values
+			// Apply sanitization for string values and use type-specific zap field constructors
 			if strValue, ok := value.(string); ok {
-				value = SanitizeField(key, strValue)
+				sanitized := SanitizeField(key, strValue)
+				fields = append(fields, zap.String(key, sanitized))
+			} else {
+				// For non-string types, use zap.Any
+				fields = append(fields, zap.Any(key, value))
 			}
-
-			fields = append(fields, zap.Any(key, value))
 		}
 	}
 

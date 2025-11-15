@@ -10,11 +10,12 @@ import "validate/validate.proto";
 
 // AccountService 账号池管理服务
 // 提供AI账号的CRUD操作、Token刷新和健康检测功能
+// 所有操作使用扁平化的路径设计，路径即操作名
 service AccountService {
   // CreateAccount 创建新账号
   rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse) {
     option (google.api.http) = {
-      post: "/v1/accounts"
+      post: "/CreateAccount"
       body: "*"
     };
   }
@@ -22,21 +23,23 @@ service AccountService {
   // ListAccounts 查询账号列表
   rpc ListAccounts(ListAccountsRequest) returns (ListAccountsResponse) {
     option (google.api.http) = {
-      get: "/v1/accounts"
+      post: "/ListAccounts"
+      body: "*"
     };
   }
 
   // GetAccount 获取账号详情
   rpc GetAccount(GetAccountRequest) returns (GetAccountResponse) {
     option (google.api.http) = {
-      get: "/v1/accounts/{Id}"
+      post: "/GetAccount"
+      body: "*"
     };
   }
 
   // UpdateAccount 更新账号信息
   rpc UpdateAccount(UpdateAccountRequest) returns (UpdateAccountResponse) {
     option (google.api.http) = {
-      put: "/v1/accounts/{Id}"
+      post: "/UpdateAccount"
       body: "*"
     };
   }
@@ -44,14 +47,15 @@ service AccountService {
   // DeleteAccount 删除账号
   rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse) {
     option (google.api.http) = {
-      delete: "/v1/accounts/{Id}"
+      post: "/DeleteAccount"
+      body: "*"
     };
   }
 
   // RefreshToken 刷新OAuth Token
   rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse) {
     option (google.api.http) = {
-      post: "/v1/accounts/{Id}/refresh"
+      post: "/RefreshToken"
       body: "*"
     };
   }
@@ -59,7 +63,7 @@ service AccountService {
   // TestAccount 测试账号连通性和健康度
   rpc TestAccount(TestAccountRequest) returns (TestAccountResponse) {
     option (google.api.http) = {
-      post: "/v1/accounts/{Id}/test"
+      post: "/TestAccount"
       body: "*"
     };
   }
@@ -69,7 +73,7 @@ service AccountService {
   // GenerateOAuthURL 生成 OAuth 授权 URL（统一接口）
   rpc GenerateOAuthURL(GenerateOAuthURLRequest) returns (GenerateOAuthURLResponse) {
     option (google.api.http) = {
-      post: "/v1/accounts/oauth/GenerateOAuthURL"
+      post: "/GenerateOAuthURL"
       body: "*"
     };
   }
@@ -77,7 +81,7 @@ service AccountService {
   // ExchangeOAuthCode 交换 OAuth 授权码（统一接口）
   rpc ExchangeOAuthCode(ExchangeOAuthCodeRequest) returns (ExchangeOAuthCodeResponse) {
     option (google.api.http) = {
-      post: "/v1/accounts/oauth/ExchangeOAuthCode"
+      post: "/ExchangeOAuthCode"
       body: "*"
     };
   }
@@ -85,7 +89,7 @@ service AccountService {
   // PollOAuthStatus 轮询 OAuth 授权状态（Device Flow 预留接口）
   rpc PollOAuthStatus(PollOAuthStatusRequest) returns (PollOAuthStatusResponse) {
     option (google.api.http) = {
-      post: "/v1/accounts/oauth/PollOAuthStatus"
+      post: "/PollOAuthStatus"
       body: "*"
     };
   }
