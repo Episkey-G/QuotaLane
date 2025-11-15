@@ -14,8 +14,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/wire"
 	"golang.org/x/net/proxy"
 )
+
+// ProviderSet is oauth providers.
+var ProviderSet = wire.NewSet(NewOAuthService)
 
 const (
 	// ClaudeOAuthTokenURL Claude OAuth Token 端点

@@ -10,6 +10,8 @@ import (
 	"QuotaLane/internal/data"
 	"QuotaLane/pkg/crypto"
 	"QuotaLane/pkg/oauth"
+	pkgoauth "QuotaLane/pkg/oauth"
+	"QuotaLane/pkg/openai"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/redis/go-redis/v9"
@@ -76,6 +78,30 @@ func (m *MockAccountRepo) UpdateAccountStatus(ctx context.Context, accountID int
 	return args.Error(0)
 }
 
+func (m *MockAccountRepo) ListAccountsByProvider(ctx context.Context, provider data.AccountProvider, status data.AccountStatus) ([]*data.Account, error) {
+	args := m.Called(ctx, provider, status)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*data.Account), args.Error(1)
+}
+
+func (m *MockAccountRepo) ListCodexCLIAccountsNeedingRefresh(ctx context.Context) ([]*data.Account, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*data.Account), args.Error(1)
+}
+
+func (m *MockAccountRepo) ListExpiringOAuthAccounts(ctx context.Context, threshold time.Time) ([]*data.Account, error) {
+	args := m.Called(ctx, threshold)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*data.Account), args.Error(1)
+}
+
 // setupTestUsecase creates a test AccountUsecase with mock dependencies.
 func setupTestUsecase(t *testing.T) (*AccountUsecase, *MockAccountRepo, *crypto.AESCrypto) {
 	mockRepo := new(MockAccountRepo)
@@ -89,10 +115,16 @@ func setupTestUsecase(t *testing.T) (*AccountUsecase, *MockAccountRepo, *crypto.
 	// Create mock OAuth service (nil for unit tests)
 	var oauthSvc oauth.OAuthService = nil
 
+	// Create mock OpenAI service (nil for unit tests)
+	var openaiSvc openai.OpenAIService = nil
+
+	// Create mock OAuth manager (nil for basic unit tests)
+	var oauthManager *pkgoauth.OAuthManager = nil
+
 	// Create mock Redis client (nil for unit tests)
 	var rdb *redis.Client = nil
 
-	uc := NewAccountUsecase(mockRepo, cryptoSvc, oauthSvc, rdb, logger)
+	uc := NewAccountUsecase(mockRepo, cryptoSvc, oauthSvc, openaiSvc, oauthManager, rdb, logger)
 	return uc, mockRepo, cryptoSvc
 }
 
@@ -111,7 +143,7 @@ func TestCreateAccount_Success(t *testing.T) {
 			req: &v1.CreateAccountRequest{
 				Name:      "Test Claude Console",
 				Provider:  v1.AccountProvider_CLAUDE_CONSOLE,
-				OauthData: `{"access_token":"test_token","refresh_token":"test_refresh"}`,
+				OAuthData: `{"access_token":"test_token","refresh_token":"test_refresh"}`,
 				RpmLimit:  50,
 				TpmLimit:  100000,
 				Metadata:  `{"region":"us-east-1"}`,
@@ -151,8 +183,8 @@ func TestCreateAccount_Success(t *testing.T) {
 				assert.NotEqual(t, tt.req.ApiKey, result.ApiKeyEncrypted)
 				assert.Contains(t, result.ApiKeyEncrypted, "****")
 			}
-			if tt.req.OauthData != "" {
-				assert.Equal(t, "[ENCRYPTED]", result.OauthDataEncrypted)
+			if tt.req.OAuthData != "" {
+				assert.Equal(t, "[ENCRYPTED]", result.OAuthDataEncrypted)
 			}
 
 			mockRepo.AssertExpectations(t)
@@ -216,7 +248,7 @@ func TestCreateAccount_InvalidOAuthData(t *testing.T) {
 	req := &v1.CreateAccountRequest{
 		Name:      "Test Account",
 		Provider:  v1.AccountProvider_CLAUDE_CONSOLE,
-		OauthData: "not a json",
+		OAuthData: "not a json",
 	}
 
 	result, err := uc.CreateAccount(ctx, req)
@@ -279,7 +311,7 @@ func TestGetAccount_Success(t *testing.T) {
 
 	// Verify sensitive data is masked
 	assert.NotEqual(t, encryptedKey, result.ApiKeyEncrypted)
-	assert.Equal(t, "[ENCRYPTED]", result.OauthDataEncrypted)
+	assert.Equal(t, "[ENCRYPTED]", result.OAuthDataEncrypted)
 
 	mockRepo.AssertExpectations(t)
 }
@@ -490,13 +522,13 @@ func TestMaskSensitiveFields(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			account := &v1.Account{
 				ApiKeyEncrypted:    tt.apiKeyEncrypted,
-				OauthDataEncrypted: tt.oauthDataEncrypted,
+				OAuthDataEncrypted: tt.oauthDataEncrypted,
 			}
 
 			uc.maskSensitiveFields(account)
 
 			assert.Equal(t, tt.expectedAPIKey, account.ApiKeyEncrypted)
-			assert.Equal(t, tt.expectedOAuth, account.OauthDataEncrypted)
+			assert.Equal(t, tt.expectedOAuth, account.OAuthDataEncrypted)
 		})
 	}
 }

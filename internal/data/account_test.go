@@ -246,6 +246,7 @@ func TestAccount_TableName(t *testing.T) {
 // TestAccount_ToProto tests GORM model to Proto conversion.
 func TestAccount_ToProto(t *testing.T) {
 	now := time.Now()
+	metadata := `{"region":"us-east-1"}`
 	account := &Account{
 		ID:                 1,
 		Name:               "Test Account",
@@ -257,7 +258,7 @@ func TestAccount_ToProto(t *testing.T) {
 		HealthScore:        95,
 		IsCircuitBroken:    false,
 		Status:             StatusActive,
-		Metadata:           `{"region":"us-east-1"}`,
+		Metadata:           &metadata,
 		CreatedAt:          now,
 		UpdatedAt:          now,
 	}
@@ -268,7 +269,7 @@ func TestAccount_ToProto(t *testing.T) {
 	assert.Equal(t, "Test Account", proto.Name)
 	assert.Equal(t, v1.AccountProvider_CLAUDE_CONSOLE, proto.Provider)
 	assert.Equal(t, "encrypted-api-key", proto.ApiKeyEncrypted)
-	assert.Equal(t, "encrypted-oauth-data", proto.OauthDataEncrypted)
+	assert.Equal(t, "encrypted-oauth-data", proto.OAuthDataEncrypted)
 	assert.Equal(t, int32(50), proto.RpmLimit)
 	assert.Equal(t, int32(100000), proto.TpmLimit)
 	assert.Equal(t, int32(95), proto.HealthScore)
@@ -366,9 +367,10 @@ func TestMaskAPIKey(t *testing.T) {
 // TestValidateMetadataJSON tests JSON metadata validation.
 func TestValidateMetadataJSON(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   string
-		wantErr bool
+		name        string
+		input       string
+		wantErr     bool
+		errContains string
 	}{
 		{
 			name:    "valid JSON object",
@@ -381,19 +383,83 @@ func TestValidateMetadataJSON(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "empty string",
-			input:   "",
+			name:    "valid JSON with proxy",
+			input:   `{"proxy_url":"socks5://127.0.0.1:1080"}`,
 			wantErr: false,
 		},
 		{
-			name:    "invalid JSON",
-			input:   `{invalid json}`,
-			wantErr: true,
+			name:    "valid empty JSON object",
+			input:   `{}`,
+			wantErr: false,
 		},
 		{
-			name:    "not a JSON",
-			input:   "plain text",
-			wantErr: true,
+			name:    "valid JSON number",
+			input:   `123`,
+			wantErr: false,
+		},
+		{
+			name:    "valid JSON string",
+			input:   `"test"`,
+			wantErr: false,
+		},
+		{
+			name:    "valid JSON boolean",
+			input:   `true`,
+			wantErr: false,
+		},
+		{
+			name:    "valid JSON null",
+			input:   `null`,
+			wantErr: false,
+		},
+		// Boundary cases that should fail
+		{
+			name:        "empty string should fail",
+			input:       "",
+			wantErr:     true,
+			errContains: "cannot be empty string",
+		},
+		{
+			name:        "whitespace only should fail",
+			input:       "   ",
+			wantErr:     true,
+			errContains: "invalid JSON",
+		},
+		{
+			name:        "invalid JSON syntax",
+			input:       `{invalid json}`,
+			wantErr:     true,
+			errContains: "invalid JSON",
+		},
+		{
+			name:        "not a JSON",
+			input:       "plain text",
+			wantErr:     true,
+			errContains: "invalid JSON",
+		},
+		{
+			name:        "incomplete JSON object",
+			input:       `{"key":`,
+			wantErr:     true,
+			errContains: "invalid JSON",
+		},
+		{
+			name:        "unquoted keys",
+			input:       `{key: "value"}`,
+			wantErr:     true,
+			errContains: "invalid JSON",
+		},
+		{
+			name:        "single quotes instead of double",
+			input:       `{'key': 'value'}`,
+			wantErr:     true,
+			errContains: "invalid JSON",
+		},
+		{
+			name:        "trailing comma",
+			input:       `{"key": "value",}`,
+			wantErr:     true,
+			errContains: "invalid JSON",
 		},
 	}
 
@@ -402,6 +468,9 @@ func TestValidateMetadataJSON(t *testing.T) {
 			err := ValidateMetadataJSON(tt.input)
 			if tt.wantErr {
 				assert.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
 			} else {
 				assert.NoError(t, err)
 			}

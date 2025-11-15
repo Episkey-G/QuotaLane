@@ -29,14 +29,14 @@ service AccountService {
   // GetAccount 获取账号详情
   rpc GetAccount(GetAccountRequest) returns (GetAccountResponse) {
     option (google.api.http) = {
-      get: "/v1/accounts/{id}"
+      get: "/v1/accounts/{Id}"
     };
   }
 
   // UpdateAccount 更新账号信息
   rpc UpdateAccount(UpdateAccountRequest) returns (UpdateAccountResponse) {
     option (google.api.http) = {
-      put: "/v1/accounts/{id}"
+      put: "/v1/accounts/{Id}"
       body: "*"
     };
   }
@@ -44,14 +44,14 @@ service AccountService {
   // DeleteAccount 删除账号
   rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse) {
     option (google.api.http) = {
-      delete: "/v1/accounts/{id}"
+      delete: "/v1/accounts/{Id}"
     };
   }
 
   // RefreshToken 刷新OAuth Token
   rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse) {
     option (google.api.http) = {
-      post: "/v1/accounts/{id}/refresh"
+      post: "/v1/accounts/{Id}/refresh"
       body: "*"
     };
   }
@@ -59,7 +59,33 @@ service AccountService {
   // TestAccount 测试账号连通性和健康度
   rpc TestAccount(TestAccountRequest) returns (TestAccountResponse) {
     option (google.api.http) = {
-      post: "/v1/accounts/{id}/test"
+      post: "/v1/accounts/{Id}/test"
+      body: "*"
+    };
+  }
+
+  // ========== 统一 OAuth 授权流程（支持多平台）==========
+
+  // GenerateOAuthURL 生成 OAuth 授权 URL（统一接口）
+  rpc GenerateOAuthURL(GenerateOAuthURLRequest) returns (GenerateOAuthURLResponse) {
+    option (google.api.http) = {
+      post: "/v1/accounts/oauth/GenerateOAuthURL"
+      body: "*"
+    };
+  }
+
+  // ExchangeOAuthCode 交换 OAuth 授权码（统一接口）
+  rpc ExchangeOAuthCode(ExchangeOAuthCodeRequest) returns (ExchangeOAuthCodeResponse) {
+    option (google.api.http) = {
+      post: "/v1/accounts/oauth/ExchangeOAuthCode"
+      body: "*"
+    };
+  }
+
+  // PollOAuthStatus 轮询 OAuth 授权状态（Device Flow 预留接口）
+  rpc PollOAuthStatus(PollOAuthStatusRequest) returns (PollOAuthStatusResponse) {
+    option (google.api.http) = {
+      post: "/v1/accounts/oauth/PollOAuthStatus"
       body: "*"
     };
   }
@@ -76,6 +102,7 @@ enum AccountProvider {
   GEMINI = 6;                // Google Gemini
   OPENAI_RESPONSES = 7;      // OpenAI Responses (Codex)
   AZURE_OPENAI = 8;          // Azure OpenAI
+  CODEX_CLI = 9;             // Codex CLI (OAuth)
 }
 
 // AccountStatus 账户状态枚举
@@ -84,117 +111,192 @@ enum AccountStatus {
   ACCOUNT_ACTIVE = 1;     // 活跃状态
   ACCOUNT_INACTIVE = 2;   // 未激活
   ACCOUNT_ERROR = 3;      // 错误状态
+  ACCOUNT_CREATED = 4;    // 已创建但未验证（用于 OAuth 流程）
 }
 
 // Account 账号信息
 message Account {
-  int64 id = 1;                                 // 账户ID
-  string name = 2;                              // 账户名称
-  AccountProvider provider = 3;                 // 服务提供商
-  string api_key_encrypted = 4;                 // 加密的API Key
-  string oauth_data_encrypted = 5;              // 加密的OAuth数据（JSON格式）
-  int32 rpm_limit = 6;                          // 每分钟请求数限制
-  int32 tpm_limit = 7;                          // 每分钟Token数限制
-  int32 health_score = 8;                       // 健康分数（0-100）
-  bool is_circuit_broken = 9;                   // 是否熔断
-  AccountStatus status = 10;                    // 账户状态
-  string metadata = 11;                         // 扩展元数据（JSON格式：代理配置、区域等）
-  google.protobuf.Timestamp created_at = 12;    // 创建时间
-  google.protobuf.Timestamp updated_at = 13;    // 更新时间
-  google.protobuf.Timestamp oauth_expires_at = 14;  // OAuth Token 过期时间（可为空）
+  int64 Id = 1;                                 // 账户ID
+  string Name = 2;                              // 账户名称
+  AccountProvider Provider = 3;                 // 服务提供商
+  string ApiKeyEncrypted = 4;                   // 加密的API Key
+  string OAuthDataEncrypted = 5;                // 加密的OAuth数据（JSON格式）
+  int32 RpmLimit = 6;                           // 每分钟请求数限制
+  int32 TpmLimit = 7;                           // 每分钟Token数限制
+  int32 HealthScore = 8;                        // 健康分数（0-100）
+  bool IsCircuitBroken = 9;                     // 是否熔断
+  AccountStatus Status = 10;                    // 账户状态
+  string Metadata = 11;                         // 扩展元数据（JSON格式：代理配置、区域等）
+  google.protobuf.Timestamp CreatedAt = 12;     // 创建时间
+  google.protobuf.Timestamp UpdatedAt = 13;     // 更新时间
+  google.protobuf.Timestamp OAuthExpiresAt = 14;  // OAuth Token 过期时间（可为空）
 }
 
 // CreateAccountRequest 创建账号请求
 message CreateAccountRequest {
-  string name = 1 [(validate.rules).string = {min_len: 1, max_len: 100}];  // 账户名称（必填）
-  AccountProvider provider = 2 [(validate.rules).enum = {defined_only: true, not_in: [0]}];  // 服务提供商（必填）
-  string api_key = 3;              // API Key（明文，服务端会加密存储）
-  string oauth_data = 4;           // OAuth数据（JSON格式，明文，服务端会加密存储）
-  int32 rpm_limit = 5 [(validate.rules).int32 = {gte: 0}];  // 每分钟请求数限制
-  int32 tpm_limit = 6 [(validate.rules).int32 = {gte: 0}];  // 每分钟Token数限制
-  string metadata = 7;             // 扩展元数据（JSON格式）
+  string Name = 1 [(validate.rules).string = {min_len: 1, max_len: 100}];  // 账户名称（必填）
+  AccountProvider Provider = 2 [(validate.rules).enum = {defined_only: true, not_in: [0]}];  // 服务提供商（必填）
+  string ApiKey = 3;              // API Key（明文，服务端会加密存储）
+  string OAuthData = 4;           // OAuth数据（JSON格式，明文，服务端会加密存储）
+  int32 RpmLimit = 5 [(validate.rules).int32 = {gte: 0}];  // 每分钟请求数限制
+  int32 TpmLimit = 6 [(validate.rules).int32 = {gte: 0}];  // 每分钟Token数限制
+  string Metadata = 7;             // 扩展元数据（JSON格式）
 }
 
 // CreateAccountResponse 创建账号响应
 message CreateAccountResponse {
-  Account account = 1;  // 创建的账号信息
+  Account Account = 1;  // 创建的账号信息
 }
 
 // ListAccountsRequest 查询账号列表请求
 message ListAccountsRequest {
-  int32 page = 1 [(validate.rules).int32 = {gte: 1}];        // 页码（从1开始）
-  int32 page_size = 2 [(validate.rules).int32 = {gte: 1, lte: 100}];  // 每页数量（1-100）
-  AccountProvider provider = 3;   // 按提供商过滤（可选）
-  AccountStatus status = 4;       // 按状态过滤（可选）
+  int32 Page = 1 [(validate.rules).int32 = {gte: 1}];        // 页码（从1开始）
+  int32 PageSize = 2 [(validate.rules).int32 = {gte: 1, lte: 100}];  // 每页数量（1-100）
+  AccountProvider Provider = 3;   // 按提供商过滤（可选）
+  AccountStatus Status = 4;       // 按状态过滤（可选）
 }
 
 // ListAccountsResponse 查询账号列表响应
 message ListAccountsResponse {
-  repeated Account accounts = 1;  // 账号列表
-  int32 total = 2;                // 总数量
-  int32 page = 3;                 // 当前页码
-  int32 page_size = 4;            // 每页数量
+  repeated Account Accounts = 1;  // 账号列表
+  int32 Total = 2;                // 总数量
+  int32 Page = 3;                 // 当前页码
+  int32 PageSize = 4;             // 每页数量
 }
 
 // GetAccountRequest 获取账号详情请求
 message GetAccountRequest {
-  int64 id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户ID（必填）
+  int64 Id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户ID（必填）
 }
 
 // GetAccountResponse 获取账号详情响应
 message GetAccountResponse {
-  Account account = 1;  // 账号信息
+  Account Account = 1;  // 账号信息
 }
 
 // UpdateAccountRequest 更新账号信息请求
 message UpdateAccountRequest {
-  int64 id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户ID（必填）
-  optional string name = 2 [(validate.rules).string = {max_len: 100}];  // 账户名称（可选）
-  optional string api_key = 3;           // API Key（明文，服务端会加密存储）（可选）
-  optional string oauth_data = 4;        // OAuth数据（JSON格式）（可选）
-  optional int32 rpm_limit = 5 [(validate.rules).int32 = {gte: 0}];  // RPM限制（可选）
-  optional int32 tpm_limit = 6 [(validate.rules).int32 = {gte: 0}];  // TPM限制（可选）
-  optional AccountStatus status = 7;     // 账户状态（可选）
-  optional string metadata = 8;          // 扩展元数据（JSON格式）（可选）
+  int64 Id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户ID（必填）
+  optional string Name = 2 [(validate.rules).string = {max_len: 100}];  // 账户名称（可选）
+  optional string ApiKey = 3;           // API Key（明文，服务端会加密存储）（可选）
+  optional string OAuthData = 4;        // OAuth数据（JSON格式）（可选）
+  optional int32 RpmLimit = 5 [(validate.rules).int32 = {gte: 0}];  // RPM限制（可选）
+  optional int32 TpmLimit = 6 [(validate.rules).int32 = {gte: 0}];  // TPM限制（可选）
+  optional AccountStatus Status = 7;     // 账户状态（可选）
+  optional string Metadata = 8;          // 扩展元数据（JSON格式）（可选）
 }
 
 // UpdateAccountResponse 更新账号信息响应
 message UpdateAccountResponse {
-  Account account = 1;  // 更新后的账号信息
+  Account Account = 1;  // 更新后的账号信息
 }
 
 // DeleteAccountRequest 删除账号请求
 message DeleteAccountRequest {
-  int64 id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户ID（必填）
+  int64 Id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户ID（必填）
 }
 
 // DeleteAccountResponse 删除账号响应
 message DeleteAccountResponse {
-  bool success = 1;  // 是否成功
-  string message = 2;  // 提示信息
+  bool Success = 1;  // 是否成功
+  string Message = 2;  // 提示信息
 }
 
 // RefreshTokenRequest 刷新Token请求
 message RefreshTokenRequest {
-  int64 id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户ID（必填）
+  int64 Id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户ID（必填）
 }
 
 // RefreshTokenResponse 刷新Token响应
 message RefreshTokenResponse {
-  bool success = 1;  // 是否成功
-  string message = 2;  // 提示信息
-  google.protobuf.Timestamp expires_at = 3;  // Token过期时间
+  bool Success = 1;  // 是否成功
+  string Message = 2;  // 提示信息
+  google.protobuf.Timestamp ExpiresAt = 3;  // Token过期时间
 }
 
 // TestAccountRequest 测试账号请求
 message TestAccountRequest {
-  int64 id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户ID（必填）
+  int64 Id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户ID（必填）
 }
 
 // TestAccountResponse 测试账号响应
 message TestAccountResponse {
-  bool success = 1;           // 是否测试成功
-  string message = 2;         // 测试结果消息
-  int32 health_score = 3;     // 健康分数（0-100）
-  int32 response_time_ms = 4; // 响应时间（毫秒）
+  bool Success = 1;           // 是否测试成功
+  string Message = 2;         // 测试结果消息
+  int32 HealthScore = 3;      // 健康分数（0-100）
+  int32 ResponseTimeMs = 4;   // 响应时间（毫秒）
+}
+
+// ========== 统一 OAuth 授权流程消息定义 ==========
+
+// ProxyConfig 代理配置
+message ProxyConfig {
+  string Url = 1;                 // 代理 URL（socks5:// 或 http://）
+  optional string Username = 2;   // 代理用户名（可选）
+  optional string Password = 3;   // 代理密码（可选）
+}
+
+// GenerateOAuthURLRequest 生成 OAuth 授权 URL 请求
+message GenerateOAuthURLRequest {
+  AccountProvider Provider = 1 [(validate.rules).enum = {defined_only: true, not_in: [0]}];  // OAuth Provider（必填）
+  optional ProxyConfig Proxy = 2;           // 请求级代理配置（优先级最高）（可选）
+  optional string RedirectUri = 3;         // 自定义重定向 URI（可选）
+  repeated string Scopes = 4;               // 自定义 scopes（可选）
+  map<string, string> Metadata = 5;         // 额外元数据（可选）
+}
+
+// GenerateOAuthURLResponse 生成 OAuth 授权 URL 响应
+message GenerateOAuthURLResponse {
+  string AuthUrl = 1;              // 授权 URL（用户需要访问此 URL 完成授权）
+  string SessionId = 2;            // 会话 ID（用于后续交换授权码）
+  string State = 3;                 // CSRF 防护 state 参数（客户端需验证）
+
+  // Device Flow 字段（预留）
+  optional string DeviceCode = 4;       // 设备码（后端轮询用）
+  optional string UserCode = 5;         // 用户码（用户输入用）
+  optional string VerificationUri = 6;  // 验证 URI（用户访问此 URL 输入 UserCode）
+  optional int32 ExpiresIn = 7;         // Device Code 过期时间（秒）
+  optional int32 Interval = 8;           // 轮询间隔（秒）
+}
+
+// ExchangeOAuthCodeRequest 交换 OAuth 授权码请求
+message ExchangeOAuthCodeRequest {
+  string SessionId = 1 [(validate.rules).string = {min_len: 1}];  // 会话 ID（必填）
+  string Code = 2 [(validate.rules).string = {min_len: 1}];        // 授权码（必填）
+  string Name = 3 [(validate.rules).string = {min_len: 1, max_len: 100}];  // 账户名称（必填）
+  optional string Description = 4 [(validate.rules).string = {max_len: 500}];  // 账户描述（可选）
+  optional int32 RpmLimit = 5 [(validate.rules).int32 = {gte: 0}];  // RPM 限制（可选）
+  optional int32 TpmLimit = 6 [(validate.rules).int32 = {gte: 0}];  // TPM 限制（可选）
+  map<string, string> Metadata = 7;  // 扩展元数据（可选）
+}
+
+// ExchangeOAuthCodeResponse 交换 OAuth 授权码响应
+message ExchangeOAuthCodeResponse {
+  int64 AccountId = 1;       // 创建的账户 ID
+  string AccountName = 2;    // 账户名称
+  AccountStatus Status = 3;   // 账户状态
+  string Message = 4;         // 提示信息
+  google.protobuf.Timestamp TokenExpiresAt = 5;  // Access token 过期时间
+}
+
+// OAuthStatusEnum OAuth 授权状态枚举
+enum OAuthStatusEnum {
+  OAUTH_STATUS_UNSPECIFIED = 0;
+  OAUTH_PENDING = 1;      // 等待授权
+  OAUTH_COMPLETED = 2;    // 授权成功
+  OAUTH_EXPIRED = 3;      // 超时
+  OAUTH_DENIED = 4;       // 拒绝
+}
+
+// PollOAuthStatusRequest 轮询 OAuth 授权状态请求（Device Flow 预留）
+message PollOAuthStatusRequest {
+  string SessionId = 1 [(validate.rules).string = {min_len: 1}];  // 会话 ID（必填）
+}
+
+// PollOAuthStatusResponse 轮询 OAuth 授权状态响应（Device Flow 预留）
+message PollOAuthStatusResponse {
+  bool Completed = 1;              // 是否完成
+  OAuthStatusEnum Status = 2;      // 授权状态
+  string Message = 3;              // 提示信息
+  optional int64 AccountId = 4;    // 账户 ID（授权成功时返回）
 }

@@ -15,6 +15,8 @@ import (
 	"QuotaLane/internal/service"
 	"QuotaLane/pkg/crypto"
 	"QuotaLane/pkg/oauth"
+	"QuotaLane/pkg/oauth/providers"
+	"QuotaLane/pkg/openai"
 
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
@@ -23,8 +25,9 @@ import (
 
 // AppComponents holds the application and its dependencies.
 type AppComponents struct {
-	App       *kratos.App
-	AccountUC *biz.AccountUsecase
+	App              *kratos.App
+	AccountUC        *biz.AccountUsecase
+	OAuthRefreshTask *biz.OAuthRefreshTask
 }
 
 // wireApp init kratos application.
@@ -35,7 +38,9 @@ func wireApp(*conf.Server, *conf.Data, *conf.Auth, log.Logger) (*AppComponents, 
 		service.ProviderSet,
 		server.ProviderSet,
 		oauth.ProviderSet,
+		openai.ProviderSet,
 		newCryptoService,
+		newOAuthManager,
 		newApp,
 		wire.Struct(new(AppComponents), "*"),
 	))
@@ -50,4 +55,23 @@ func newCryptoService(auth *conf.Auth) (*crypto.AESCrypto, error) {
 		return nil, fmt.Errorf("encryption key must be exactly 32 bytes, got %d bytes", len(auth.Encryption.Key))
 	}
 	return crypto.NewAESCrypto([]byte(auth.Encryption.Key))
+}
+
+// newOAuthManager creates OAuth Manager and registers providers.
+func newOAuthManager(dataData *data.Data, openaiService openai.OpenAIService, logger log.Logger) *oauth.OAuthManager {
+	manager := oauth.NewOAuthManager(dataData.GetRedisClient(), logger)
+
+	// 注册 Claude OAuth Provider
+	claudeProvider := providers.NewClaudeProvider(logger)
+	manager.RegisterProvider(claudeProvider)
+
+	// 注册 Codex CLI OAuth Provider
+	codexProvider := providers.NewCodexProvider(logger)
+	manager.RegisterProvider(codexProvider)
+
+	// 注册 OpenAI Responses Provider（非 OAuth，仅 ValidateToken）
+	openaiResponsesProvider := providers.NewOpenAIResponsesProvider(openaiService, logger)
+	manager.RegisterProvider(openaiResponsesProvider)
+
+	return manager
 }

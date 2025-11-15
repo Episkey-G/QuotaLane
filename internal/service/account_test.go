@@ -11,6 +11,7 @@ import (
 	"QuotaLane/internal/data"
 	"QuotaLane/pkg/crypto"
 	"QuotaLane/pkg/oauth"
+	"QuotaLane/pkg/openai"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/redis/go-redis/v9"
@@ -77,6 +78,22 @@ func (m *MockAccountRepo) UpdateAccountStatus(ctx context.Context, accountID int
 	return args.Error(0)
 }
 
+func (m *MockAccountRepo) ListAccountsByProvider(ctx context.Context, provider data.AccountProvider, status data.AccountStatus) ([]*data.Account, error) {
+	args := m.Called(ctx, provider, status)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*data.Account), args.Error(1)
+}
+
+func (m *MockAccountRepo) ListCodexCLIAccountsNeedingRefresh(ctx context.Context) ([]*data.Account, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*data.Account), args.Error(1)
+}
+
 // MockOAuthService is a mock implementation of oauth.OAuthService for testing.
 type MockOAuthService struct {
 	mock.Mock
@@ -105,8 +122,14 @@ func setupTestService(t *testing.T) (*AccountService, *MockAccountRepo) {
 	// For unit tests, we don't actually need a real Redis connection
 	var rdb *redis.Client = nil
 
+	// Create mock OpenAI service (nil for unit tests)
+	var mockOpenAI openai.OpenAIService = nil
+
+	// Create mock OAuth manager (nil for unit tests)
+	var mockOAuthManager *oauth.OAuthManager = nil
+
 	// Create real usecase with mock dependencies
-	uc := biz.NewAccountUsecase(mockRepo, cryptoSvc, mockOAuth, rdb, logger)
+	uc := biz.NewAccountUsecase(mockRepo, cryptoSvc, mockOAuth, mockOpenAI, mockOAuthManager, rdb, logger)
 
 	// Create service with real usecase
 	svc := NewAccountService(uc, logger)
@@ -384,22 +407,38 @@ func TestRefreshToken(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
-// TestTestAccount tests TestAccount placeholder.
+// TestTestAccount tests TestAccount RPC method with OpenAI Responses account.
 func TestTestAccount(t *testing.T) {
-	svc, _ := setupTestService(t)
+	svc, mockRepo := setupTestService(t)
 	ctx := context.Background()
+
+	// Setup test account (OpenAI Responses type)
+	testAccount := &data.Account{
+		ID:              1,
+		Name:            "Test OpenAI Account",
+		Provider:        data.ProviderOpenAIResponses,
+		Status:          data.StatusActive,
+		HealthScore:     100,
+		APIKeyEncrypted: "encrypted_key",
+		BaseAPI:         "https://api.openai.com",
+		IsCircuitBroken: false,
+	}
+
+	// Mock GetAccount call
+	mockRepo.On("GetAccount", ctx, int64(1)).Return(testAccount, nil)
 
 	req := &v1.TestAccountRequest{
 		Id: 1,
 	}
 
+	// This will fail because we don't have real OpenAI service or network
+	// But it should return a proper response structure
 	resp, err := svc.TestAccount(ctx, req)
 
-	// Should return success=false with message about future implementation
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
+	// The test will fail validation (no real API), so success should be false
 	assert.False(t, resp.Success)
-	assert.Contains(t, resp.Message, "Story 2.3")
-	assert.Equal(t, int32(0), resp.HealthScore)
-	assert.Equal(t, int32(0), resp.ResponseTimeMs)
+	assert.NotEmpty(t, resp.Message)
+	mockRepo.AssertExpectations(t)
 }

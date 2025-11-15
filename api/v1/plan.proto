@@ -21,7 +21,7 @@ service PlanService {
   // GetPlan 获取套餐详情
   rpc GetPlan(GetPlanRequest) returns (GetPlanResponse) {
     option (google.api.http) = {
-      get: "/v1/plans/{id}"
+      get: "/v1/plans/{Id}"
     };
   }
 
@@ -65,65 +65,65 @@ enum SubscriptionStatus {
 
 // Plan 套餐信息
 message Plan {
-  int64 id = 1;                                // 套餐ID
-  string name = 2;                             // 套餐名称
-  string description = 3;                      // 套餐描述
-  double price = 4;                            // 套餐价格（美元）
-  double dollar_limit = 5;                     // 美元额度限制
-  int32 duration_days = 6;                     // 有效期（天数）
-  int32 rpm_limit = 7;                         // 每分钟请求数限制（0表示无限制）
-  string features = 8;                         // 套餐特性（JSON格式）
-  string badge = 9;                            // 套餐徽章
-  PlanStatus status = 10;                      // 套餐状态
-  google.protobuf.Timestamp created_at = 11;   // 创建时间
-  google.protobuf.Timestamp updated_at = 12;   // 更新时间
+  int64 Id = 1;                                // 套餐ID
+  string Name = 2;                             // 套餐名称
+  string Description = 3;                      // 套餐描述
+  double Price = 4;                            // 套餐价格（美元）
+  double DollarLimit = 5;                     // 美元额度限制
+  int32 DurationDays = 6;                     // 有效期（天数）
+  int32 RpmLimit = 7;                         // 每分钟请求数限制（0表示无限制）
+  string Features = 8;                         // 套餐特性（JSON格式）
+  string Badge = 9;                            // 套餐徽章
+  PlanStatus Status = 10;                      // 套餐状态
+  google.protobuf.Timestamp CreatedAt = 11;   // 创建时间
+  google.protobuf.Timestamp UpdatedAt = 12;   // 更新时间
 }
 
 // Subscription 订阅信息
 message Subscription {
-  int64 id = 1;                                     // 订阅ID
-  int64 user_id = 2;                                // 用户ID
-  int64 plan_id = 3;                                // 套餐ID
-  Plan plan = 4;                                    // 套餐详情
-  google.protobuf.Timestamp starts_at = 5;          // 开始时间
-  google.protobuf.Timestamp expires_at = 6;         // 过期时间
-  SubscriptionStatus status = 7;                    // 订阅状态
-  google.protobuf.Timestamp created_at = 8;         // 创建时间
+  int64 Id = 1;                                     // 订阅ID
+  int64 UserId = 2;                                // 用户ID
+  int64 PlanId = 3;                                // 套餐ID
+  Plan Plan = 4;                                    // 套餐详情
+  google.protobuf.Timestamp StartsAt = 5;          // 开始时间
+  google.protobuf.Timestamp ExpiresAt = 6;         // 过期时间
+  SubscriptionStatus Status = 7;                    // 订阅状态
+  google.protobuf.Timestamp CreatedAt = 8;         // 创建时间
 }
 
 // ListPlansRequest 查询套餐列表请求
 message ListPlansRequest {
-  optional PlanStatus status = 1;  // 按状态过滤（可选）
+  optional PlanStatus Status = 1;  // 按状态过滤（可选）
 }
 
 // ListPlansResponse 查询套餐列表响应
 message ListPlansResponse {
-  repeated Plan plans = 1;  // 套餐列表
+  repeated Plan Plans = 1;  // 套餐列表
 }
 
 // GetPlanRequest 获取套餐详情请求
 message GetPlanRequest {
-  int64 id = 1 [(validate.rules).int64 = {gt: 0}];  // 套餐ID（必填）
+  int64 Id = 1 [(validate.rules).int64 = {gt: 0}];  // 套餐ID（必填）
 }
 
 // GetPlanResponse 获取套餐详情响应
 message GetPlanResponse {
-  Plan plan = 1;  // 套餐信息
+  Plan Plan = 1;  // 套餐信息
 }
 
 // SubscribeRequest 订阅套餐请求
 message SubscribeRequest {
-  int64 plan_id = 1 [(validate.rules).int64 = {gt: 0}];  // 套餐ID（必填）
-  optional string discount_code = 2 [(validate.rules).string = {max_len: 50}];  // 折扣码（可选）
+  int64 PlanId = 1 [(validate.rules).int64 = {gt: 0}];  // 套餐ID（必填）
+  optional string DiscountCode = 2 [(validate.rules).string = {max_len: 50}];  // 折扣码（可选）
 }
 
 // SubscribeResponse 订阅套餐响应
 message SubscribeResponse {
-  int64 order_id = 1;         // 订单ID
-  Subscription subscription = 2;  // 订阅信息
-  double amount = 3;          // 应付金额
-  double discount = 4;        // 折扣金额
-  string message = 5;         // 提示信息
+  int64 OrderId = 1;         // 订单ID
+  Subscription Subscription = 2;  // 订阅信息
+  double Amount = 3;          // 应付金额
+  double Discount = 4;        // 折扣金额
+  string Message = 5;         // 提示信息
 }
 
 // GetCurrentSubscriptionRequest 获取当前订阅请求
@@ -133,10 +133,10 @@ message GetCurrentSubscriptionRequest {
 
 // GetCurrentSubscriptionResponse 获取当前订阅响应
 message GetCurrentSubscriptionResponse {
-  optional Subscription subscription = 1;  // 当前订阅（可能为空）
-  double quota_limit = 2;                  // 配额限制（美元）
-  double quota_used = 3;                   // 已使用配额（美元）
-  double quota_remaining = 4;              // 剩余配额（美元）
+  optional Subscription Subscription = 1;  // 当前订阅（可能为空）
+  double QuotaLimit = 2;                  // 配额限制（美元）
+  double QuotaUsed = 3;                   // 已使用配额（美元）
+  double QuotaRemaining = 4;              // 剩余配额（美元）
 }
 
 // CancelSubscriptionRequest 取消订阅请求
@@ -146,6 +146,6 @@ message CancelSubscriptionRequest {
 
 // CancelSubscriptionResponse 取消订阅响应
 message CancelSubscriptionResponse {
-  bool success = 1;  // 是否成功
-  string message = 2;  // 提示信息
+  bool Success = 1;  // 是否成功
+  string Message = 2;  // 提示信息
 }

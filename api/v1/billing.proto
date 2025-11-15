@@ -21,14 +21,14 @@ service BillingService {
   // GetOrder 获取订单详情
   rpc GetOrder(GetOrderRequest) returns (GetOrderResponse) {
     option (google.api.http) = {
-      get: "/v1/orders/{id}"
+      get: "/v1/orders/{Id}"
     };
   }
 
   // CancelOrder 取消订单
   rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse) {
     option (google.api.http) = {
-      post: "/v1/orders/{id}/cancel"
+      post: "/v1/orders/{Id}/cancel"
       body: "*"
     };
   }
@@ -84,109 +84,109 @@ enum InviteCodeStatus {
 
 // Order 订单信息
 message Order {
-  int64 id = 1;                                  // 订单ID
-  string order_no = 2;                           // 订单编号
-  int64 user_id = 3;                             // 用户ID
-  int64 plan_id = 4;                             // 套餐ID
-  string plan_name = 5;                          // 套餐名称
-  double original_amount = 6;                    // 原始金额（美元）
-  double discount_amount = 7;                    // 折扣金额（美元）
-  double final_amount = 8;                       // 最终金额（美元）
-  OrderStatus status = 9;                        // 订单状态
-  google.protobuf.Timestamp paid_at = 10;        // 支付时间
-  google.protobuf.Timestamp starts_at = 11;      // 套餐开始时间
-  google.protobuf.Timestamp expires_at = 12;     // 套餐过期时间
-  google.protobuf.Timestamp created_at = 13;     // 创建时间
-  google.protobuf.Timestamp updated_at = 14;     // 更新时间
+  int64 Id = 1;                                  // 订单ID
+  string OrderNo = 2;                           // 订单编号
+  int64 UserId = 3;                             // 用户ID
+  int64 PlanId = 4;                             // 套餐ID
+  string PlanName = 5;                          // 套餐名称
+  double OriginalAmount = 6;                    // 原始金额（美元）
+  double DiscountAmount = 7;                    // 折扣金额（美元）
+  double FinalAmount = 8;                       // 最终金额（美元）
+  OrderStatus Status = 9;                        // 订单状态
+  google.protobuf.Timestamp PaidAt = 10;        // 支付时间
+  google.protobuf.Timestamp StartsAt = 11;      // 套餐开始时间
+  google.protobuf.Timestamp ExpiresAt = 12;     // 套餐过期时间
+  google.protobuf.Timestamp CreatedAt = 13;     // 创建时间
+  google.protobuf.Timestamp UpdatedAt = 14;     // 更新时间
 }
 
 // DiscountCode 折扣码信息
 message DiscountCode {
-  int64 id = 1;                                     // 折扣码ID
-  string code = 2;                                  // 折扣码
-  DiscountType discount_type = 3;                   // 折扣类型
-  double discount_value = 4;                        // 折扣值（百分比或金额）
-  int32 max_uses = 5;                               // 最大使用次数（0表示无限制）
-  int32 current_uses = 6;                           // 当前使用次数
-  google.protobuf.Timestamp starts_at = 7;          // 生效时间
-  google.protobuf.Timestamp expires_at = 8;         // 过期时间
-  DiscountCodeStatus status = 9;                    // 折扣码状态
-  google.protobuf.Timestamp created_at = 10;        // 创建时间
-  google.protobuf.Timestamp updated_at = 11;        // 更新时间
+  int64 Id = 1;                                     // 折扣码ID
+  string Code = 2;                                  // 折扣码
+  DiscountType DiscountType = 3;                   // 折扣类型
+  double DiscountValue = 4;                        // 折扣值（百分比或金额）
+  int32 MaxUses = 5;                               // 最大使用次数（0表示无限制）
+  int32 CurrentUses = 6;                           // 当前使用次数
+  google.protobuf.Timestamp StartsAt = 7;          // 生效时间
+  google.protobuf.Timestamp ExpiresAt = 8;         // 过期时间
+  DiscountCodeStatus Status = 9;                    // 折扣码状态
+  google.protobuf.Timestamp CreatedAt = 10;        // 创建时间
+  google.protobuf.Timestamp UpdatedAt = 11;        // 更新时间
 }
 
 // InviteCode 邀请码信息
 message InviteCode {
-  int64 id = 1;                                   // 邀请码ID
-  string code = 2;                                // 邀请码
-  optional int64 created_by = 3;                  // 创建者ID
-  int32 max_uses = 4;                             // 最大使用次数
-  int32 current_uses = 5;                         // 当前使用次数
-  google.protobuf.Timestamp expires_at = 6;       // 过期时间
-  InviteCodeStatus status = 7;                    // 邀请码状态
-  google.protobuf.Timestamp created_at = 8;       // 创建时间
-  google.protobuf.Timestamp updated_at = 9;       // 更新时间
+  int64 Id = 1;                                   // 邀请码ID
+  string Code = 2;                                // 邀请码
+  optional int64 CreatedBy = 3;                  // 创建者ID
+  int32 MaxUses = 4;                             // 最大使用次数
+  int32 CurrentUses = 5;                         // 当前使用次数
+  google.protobuf.Timestamp ExpiresAt = 6;       // 过期时间
+  InviteCodeStatus Status = 7;                    // 邀请码状态
+  google.protobuf.Timestamp CreatedAt = 8;       // 创建时间
+  google.protobuf.Timestamp UpdatedAt = 9;       // 更新时间
 }
 
 // ListOrdersRequest 查询订单列表请求
 message ListOrdersRequest {
-  optional OrderStatus status = 1;  // 按状态过滤（可选）
-  int32 page = 2 [(validate.rules).int32 = {gte: 1}];  // 页码（从1开始）
-  int32 page_size = 3 [(validate.rules).int32 = {gte: 1, lte: 100}];  // 每页数量（1-100）
+  optional OrderStatus Status = 1;  // 按状态过滤（可选）
+  int32 Page = 2 [(validate.rules).int32 = {gte: 1}];  // 页码（从1开始）
+  int32 PageSize = 3 [(validate.rules).int32 = {gte: 1, lte: 100}];  // 每页数量（1-100）
 }
 
 // ListOrdersResponse 查询订单列表响应
 message ListOrdersResponse {
-  repeated Order orders = 1;  // 订单列表
-  int32 total = 2;            // 总数量
-  int32 page = 3;             // 当前页码
-  int32 page_size = 4;        // 每页数量
+  repeated Order Orders = 1;  // 订单列表
+  int32 Total = 2;            // 总数量
+  int32 Page = 3;             // 当前页码
+  int32 PageSize = 4;        // 每页数量
 }
 
 // GetOrderRequest 获取订单详情请求
 message GetOrderRequest {
-  int64 id = 1 [(validate.rules).int64 = {gt: 0}];  // 订单ID（必填）
+  int64 Id = 1 [(validate.rules).int64 = {gt: 0}];  // 订单ID（必填）
 }
 
 // GetOrderResponse 获取订单详情响应
 message GetOrderResponse {
-  Order order = 1;  // 订单信息
+  Order Order = 1;  // 订单信息
 }
 
 // CancelOrderRequest 取消订单请求
 message CancelOrderRequest {
-  int64 id = 1 [(validate.rules).int64 = {gt: 0}];  // 订单ID（必填）
-  optional string reason = 2 [(validate.rules).string = {max_len: 500}];  // 取消原因（可选）
+  int64 Id = 1 [(validate.rules).int64 = {gt: 0}];  // 订单ID（必填）
+  optional string Reason = 2 [(validate.rules).string = {max_len: 500}];  // 取消原因（可选）
 }
 
 // CancelOrderResponse 取消订单响应
 message CancelOrderResponse {
-  bool success = 1;  // 是否成功
-  string message = 2;  // 提示信息
+  bool Success = 1;  // 是否成功
+  string Message = 2;  // 提示信息
 }
 
 // ValidateDiscountCodeRequest 验证折扣码请求
 message ValidateDiscountCodeRequest {
-  string code = 1 [(validate.rules).string = {min_len: 1, max_len: 50}];  // 折扣码（必填）
-  double amount = 2 [(validate.rules).double = {gt: 0}];  // 订单金额（必填）
+  string Code = 1 [(validate.rules).string = {min_len: 1, max_len: 50}];  // 折扣码（必填）
+  double Amount = 2 [(validate.rules).double = {gt: 0}];  // 订单金额（必填）
 }
 
 // ValidateDiscountCodeResponse 验证折扣码响应
 message ValidateDiscountCodeResponse {
-  bool valid = 1;                 // 是否有效
-  DiscountCode discount_code = 2; // 折扣码信息
-  double discount_amount = 3;     // 折扣金额
-  double final_amount = 4;        // 最终金额
-  string message = 5;             // 验证结果消息
+  bool Valid = 1;                 // 是否有效
+  DiscountCode DiscountCode = 2; // 折扣码信息
+  double DiscountAmount = 3;     // 折扣金额
+  double FinalAmount = 4;        // 最终金额
+  string Message = 5;             // 验证结果消息
 }
 
 // GenerateInviteCodeRequest 生成邀请码请求
 message GenerateInviteCodeRequest {
-  optional int32 max_uses = 1 [(validate.rules).int32 = {gt: 0}];  // 最大使用次数（可选，默认1）
-  optional int64 expires_in_days = 2 [(validate.rules).int64 = {gt: 0, lte: 365}];  // 过期天数（可选，1-365天）
+  optional int32 MaxUses = 1 [(validate.rules).int32 = {gt: 0}];  // 最大使用次数（可选，默认1）
+  optional int64 ExpiresInDays = 2 [(validate.rules).int64 = {gt: 0, lte: 365}];  // 过期天数（可选，1-365天）
 }
 
 // GenerateInviteCodeResponse 生成邀请码响应
 message GenerateInviteCodeResponse {
-  InviteCode invite_code = 1;  // 生成的邀请码信息
+  InviteCode InviteCode = 1;  // 生成的邀请码信息
 }

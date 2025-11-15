@@ -8,6 +8,8 @@ import (
 	"QuotaLane/internal/data"
 	"QuotaLane/pkg/crypto"
 	"QuotaLane/pkg/oauth"
+	pkgoauth "QuotaLane/pkg/oauth" // 统一 OAuth Manager
+	"QuotaLane/pkg/openai"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/redis/go-redis/v9"
@@ -15,21 +17,25 @@ import (
 
 // AccountUsecase implements account business logic.
 type AccountUsecase struct {
-	repo   data.AccountRepo
-	crypto *crypto.AESCrypto
-	oauth  oauth.OAuthService
-	rdb    *redis.Client
-	logger *log.Helper
+	repo          data.AccountRepo
+	crypto        *crypto.AESCrypto
+	oauth         oauth.OAuthService
+	openaiService openai.OpenAIService
+	oauthManager  *pkgoauth.OAuthManager // 统一 OAuth Manager
+	rdb           *redis.Client
+	logger        *log.Helper
 }
 
 // NewAccountUsecase creates a new account usecase.
-func NewAccountUsecase(repo data.AccountRepo, crypto *crypto.AESCrypto, oauth oauth.OAuthService, rdb *redis.Client, logger log.Logger) *AccountUsecase {
+func NewAccountUsecase(repo data.AccountRepo, crypto *crypto.AESCrypto, oauth oauth.OAuthService, openaiService openai.OpenAIService, oauthManager *pkgoauth.OAuthManager, rdb *redis.Client, logger log.Logger) *AccountUsecase {
 	return &AccountUsecase{
-		repo:   repo,
-		crypto: crypto,
-		oauth:  oauth,
-		rdb:    rdb,
-		logger: log.NewHelper(logger),
+		repo:          repo,
+		crypto:        crypto,
+		oauth:         oauth,
+		openaiService: openaiService,
+		oauthManager:  oauthManager,
+		rdb:           rdb,
+		logger:        log.NewHelper(logger),
 	}
 }
 
@@ -42,11 +48,13 @@ func (uc *AccountUsecase) CreateAccount(ctx context.Context, req *v1.CreateAccou
 			req.Provider)
 	}
 
-	// Validate metadata JSON if provided
+	// Validate and prepare metadata
+	var metadataPtr *string
 	if req.Metadata != "" {
 		if err := data.ValidateMetadataJSON(req.Metadata); err != nil {
 			return nil, fmt.Errorf("invalid metadata: %w", err)
 		}
+		metadataPtr = &req.Metadata
 	}
 
 	// Create account model
@@ -58,7 +66,7 @@ func (uc *AccountUsecase) CreateAccount(ctx context.Context, req *v1.CreateAccou
 		HealthScore:     100, // Initial health score
 		IsCircuitBroken: false,
 		Status:          data.StatusActive,
-		Metadata:        req.Metadata,
+		Metadata:        metadataPtr,
 	}
 
 	// Encrypt API Key if provided (for OPENAI_RESPONSES)
@@ -72,13 +80,13 @@ func (uc *AccountUsecase) CreateAccount(ctx context.Context, req *v1.CreateAccou
 	}
 
 	// Encrypt OAuth Data if provided (for CLAUDE_CONSOLE)
-	if req.OauthData != "" {
+	if req.OAuthData != "" {
 		// Validate OAuth data is valid JSON
-		if err := data.ValidateMetadataJSON(req.OauthData); err != nil {
+		if err := data.ValidateMetadataJSON(req.OAuthData); err != nil {
 			return nil, fmt.Errorf("invalid OAuth data format: %w", err)
 		}
 
-		encrypted, err := uc.crypto.Encrypt(req.OauthData)
+		encrypted, err := uc.crypto.Encrypt(req.OAuthData)
 		if err != nil {
 			uc.logger.Errorf("failed to encrypt OAuth data: %v", err)
 			return nil, fmt.Errorf("failed to encrypt credentials")
@@ -176,7 +184,7 @@ func (uc *AccountUsecase) UpdateAccount(ctx context.Context, req *v1.UpdateAccou
 		if err := data.ValidateMetadataJSON(*req.Metadata); err != nil {
 			return nil, fmt.Errorf("invalid metadata: %w", err)
 		}
-		account.Metadata = *req.Metadata
+		account.Metadata = req.Metadata
 	}
 
 	// Update API Key if provided
@@ -190,13 +198,13 @@ func (uc *AccountUsecase) UpdateAccount(ctx context.Context, req *v1.UpdateAccou
 	}
 
 	// Update OAuth Data if provided
-	if req.OauthData != nil && *req.OauthData != "" {
+	if req.OAuthData != nil && *req.OAuthData != "" {
 		// Validate OAuth data is valid JSON
-		if err := data.ValidateMetadataJSON(*req.OauthData); err != nil {
+		if err := data.ValidateMetadataJSON(*req.OAuthData); err != nil {
 			return nil, fmt.Errorf("invalid OAuth data format: %w", err)
 		}
 
-		encrypted, err := uc.crypto.Encrypt(*req.OauthData)
+		encrypted, err := uc.crypto.Encrypt(*req.OAuthData)
 		if err != nil {
 			uc.logger.Errorf("failed to encrypt OAuth data: %v", err)
 			return nil, fmt.Errorf("failed to encrypt credentials")
@@ -243,7 +251,7 @@ func (uc *AccountUsecase) maskSensitiveFields(account *v1.Account) {
 	}
 
 	// Mask OAuth Data: replace with placeholder
-	if account.OauthDataEncrypted != "" {
-		account.OauthDataEncrypted = "[ENCRYPTED]"
+	if account.OAuthDataEncrypted != "" {
+		account.OAuthDataEncrypted = "[ENCRYPTED]"
 	}
 }
