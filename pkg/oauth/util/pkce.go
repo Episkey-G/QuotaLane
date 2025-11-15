@@ -1,3 +1,5 @@
+// Package util provides OAuth utility functions including PKCE generation.
+
 package util
 
 import (
