@@ -17,6 +17,7 @@ var ProviderSet = wire.NewSet(
 	NewCacheClient,
 	NewMySQLClient,
 	NewAccountRepo,
+	NewRateLimitRepo,
 )
 
 // Data contains all data layer dependencies.

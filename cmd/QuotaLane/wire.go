@@ -28,6 +28,8 @@ type AppComponents struct {
 	App              *kratos.App
 	AccountUC        *biz.AccountUsecase
 	OAuthRefreshTask *biz.OAuthRefreshTask
+	RateLimiter      *biz.RateLimiterUseCase
+	AccountRepo      data.AccountRepo
 }
 
 // wireApp init kratos application.

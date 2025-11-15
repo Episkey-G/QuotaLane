@@ -10,6 +10,7 @@ import (
 
 	"QuotaLane/internal/biz"
 	"QuotaLane/internal/conf"
+	"QuotaLane/internal/data"
 	zapLogger "QuotaLane/pkg/log"
 
 	"github.com/go-kratos/kratos/v2"
@@ -83,9 +84,9 @@ func main() {
 		"span.id", tracing.SpanID(),
 	)
 
-	// Log startup configuration
-	log.NewHelper(logger).Infow(
-		"msg", "QuotaLane service starting",
+	// Log startup configuration using enhanced LogHelper
+	zapLogger.NewLogHelper(logger).Startup(
+		"QuotaLane service starting",
 		"log.level", bc.Log.Level,
 		"log.format", bc.Log.Format,
 	)
@@ -96,12 +97,12 @@ func main() {
 	}
 	defer cleanup()
 
-	// Initialize and start cron scheduler for OAuth token refresh
-	cronScheduler := setupCronJobs(appComponents.AccountUC, appComponents.OAuthRefreshTask, logger)
+	// Initialize and start cron scheduler for OAuth token refresh and concurrency cleanup
+	cronScheduler := setupCronJobs(appComponents.AccountUC, appComponents.OAuthRefreshTask, appComponents.RateLimiter, appComponents.AccountRepo, logger)
 	cronScheduler.Start()
 	defer cronScheduler.Stop()
 
-	log.NewHelper(logger).Info("Cron scheduler started for OAuth token refresh")
+	zapLogger.NewLogHelper(logger).Startup("Cron scheduler started for OAuth token refresh and concurrency cleanup")
 
 	// start and wait for stop signal
 	if err := appComponents.App.Run(); err != nil {
@@ -110,9 +111,9 @@ func main() {
 }
 
 // setupCronJobs configures and returns the cron scheduler.
-// The scheduler runs AutoRefreshTokens every 5 minutes.
-func setupCronJobs(accountUC *biz.AccountUsecase, oauthRefreshTask *biz.OAuthRefreshTask, logger log.Logger) *cron.Cron {
-	helper := log.NewHelper(logger)
+// The scheduler runs AutoRefreshTokens every 5 minutes and concurrency cleanup every minute.
+func setupCronJobs(accountUC *biz.AccountUsecase, oauthRefreshTask *biz.OAuthRefreshTask, rateLimiter *biz.RateLimiterUseCase, accountRepo data.AccountRepo, logger log.Logger) *cron.Cron {
+	helper := zapLogger.NewLogHelper(logger)
 
 	// Create cron scheduler with seconds support for unified OAuth refresh
 	c := cron.New(cron.WithSeconds())
@@ -188,6 +189,58 @@ func setupCronJobs(accountUC *biz.AccountUsecase, oauthRefreshTask *biz.OAuthRef
 
 	if err != nil {
 		helper.Fatalf("failed to add OpenAI health check cron job: %v", err)
+	}
+
+	// Add concurrency cleanup job (every minute)
+	// Cron format: "0 * * * * *" = every minute at second 0
+	// Cleans up expired concurrency slots (> 10 minutes old)
+	_, err = c.AddFunc("0 * * * * *", func() {
+		defer func() {
+			if r := recover(); r != nil {
+				helper.Errorf("panic in concurrency cleanup cron job: %v", r)
+			}
+		}()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+
+		helper.Debug("Starting concurrency cleanup cron job")
+
+		// Get all active account IDs
+		accounts, _, err := accountRepo.ListAccounts(ctx, &data.AccountFilter{
+			Status:   data.StatusActive,
+			Page:     1,
+			PageSize: 1000, // Process up to 1000 accounts per run
+		})
+		if err != nil {
+			helper.Errorw("Failed to list accounts for concurrency cleanup", "error", err)
+			return
+		}
+
+		// Extract account IDs
+		accountIDs := make([]int64, 0, len(accounts))
+		for _, account := range accounts {
+			accountIDs = append(accountIDs, account.ID)
+		}
+
+		if len(accountIDs) == 0 {
+			helper.Debug("No active accounts to clean up")
+			return
+		}
+
+		// Clean up expired concurrency for all accounts
+		cleanedCount, err := rateLimiter.CleanupExpiredConcurrencyForAllAccounts(ctx, accountIDs)
+		if err != nil {
+			helper.Errorw("Concurrency cleanup cron job failed", "error", err)
+		} else {
+			helper.Debugw("Concurrency cleanup cron job completed",
+				"total_accounts", len(accountIDs),
+				"cleaned", cleanedCount)
+		}
+	})
+
+	if err != nil {
+		helper.Fatalf("failed to add concurrency cleanup cron job: %v", err)
 	}
 
 	return c

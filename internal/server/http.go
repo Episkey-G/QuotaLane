@@ -3,7 +3,9 @@ package server
 import (
 	v1 "QuotaLane/api/v1"
 	"QuotaLane/internal/conf"
+	"QuotaLane/internal/server/middleware"
 	"QuotaLane/internal/service"
+	pkglog "QuotaLane/pkg/log"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
@@ -11,10 +13,15 @@ import (
 )
 
 // NewHTTPServer new an HTTP server.
-func NewHTTPServer(c *conf.Server, accountService *service.AccountService, _ log.Logger) *http.Server {
+func NewHTTPServer(c *conf.Server, accountService *service.AccountService, logger log.Logger) *http.Server {
+	// 创建增强的日志辅助器
+	logHelper := pkglog.NewLogHelper(logger)
+
 	var opts = []http.ServerOption{
 		http.Middleware(
 			recovery.Recovery(),
+			middleware.Auth(logHelper),    // 认证中间件：记录 API Key 和 User-Agent
+			middleware.Logging(logHelper), // 请求日志中间件：记录请求方法、路径、耗时
 		),
 	}
 	if c.Http.Network != "" {

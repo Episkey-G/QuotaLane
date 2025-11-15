@@ -14,10 +14,11 @@ import (
 )
 
 // customTimeEncoder 使用北京时间 (UTC+8) 格式化时间
+// 格式: [2006-01-02 15:04:05] - 更简洁易读的格式
 func customTimeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 	// 转换为北京时间 (UTC+8)
 	beijingTime := t.In(time.FixedZone("CST", 8*3600))
-	enc.AppendString(beijingTime.Format("2006-01-02T15:04:05.000+08:00"))
+	enc.AppendString(beijingTime.Format("[2006-01-02 15:04:05]"))
 }
 
 // NewZapLogger creates a new Zap logger based on the provided configuration
@@ -58,10 +59,11 @@ func NewZapLogger(cfg *conf.Log) (*zap.Logger, error) {
 	}
 
 	// Choose encoder based on format
+	// 使用自定义 EmojiConsoleEncoder 替代标准 ConsoleEncoder
 	var encoder zapcore.Encoder
 	format := strings.ToLower(cfg.Format)
 	if format == "console" || env == "development" {
-		encoder = zapcore.NewConsoleEncoder(encoderConfig)
+		encoder = NewEmojiConsoleEncoder(encoderConfig) // 使用 Emoji Encoder
 	} else {
 		encoder = zapcore.NewJSONEncoder(encoderConfig)
 	}

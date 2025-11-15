@@ -133,8 +133,16 @@ func (uc *AccountUsecase) ListAccounts(ctx context.Context, req *v1.ListAccounts
 	filter := &data.AccountFilter{
 		Page:     req.Page,
 		PageSize: req.PageSize,
-		Provider: data.ProviderFromProto(req.Provider),
-		Status:   data.StatusFromProto(req.Status),
+	}
+
+	// Handle optional Provider filter (0 means unspecified)
+	if req.Provider != v1.AccountProvider_ACCOUNT_PROVIDER_UNSPECIFIED {
+		filter.Provider = data.ProviderFromProto(req.Provider)
+	}
+
+	// Handle optional Status filter (0 means unspecified)
+	if req.Status != v1.AccountStatus_ACCOUNT_STATUS_UNSPECIFIED {
+		filter.Status = data.StatusFromProto(req.Status)
 	}
 
 	accounts, total, err := uc.repo.ListAccounts(ctx, filter)
