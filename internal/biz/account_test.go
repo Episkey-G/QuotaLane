@@ -68,7 +68,7 @@ func (m *MockAccountRepo) UpdateOAuthData(ctx context.Context, accountID int64, 
 	return args.Error(0)
 }
 
-func (m *MockAccountRepo) UpdateHealthScore(ctx context.Context, accountID int64, score int32) error {
+func (m *MockAccountRepo) UpdateHealthScore(ctx context.Context, accountID int64, score int) error {
 	args := m.Called(ctx, accountID, score)
 	return args.Error(0)
 }
@@ -124,7 +124,10 @@ func setupTestUsecase(t *testing.T) (*AccountUsecase, *MockAccountRepo, *crypto.
 	// Create mock Redis client (nil for unit tests)
 	var rdb *redis.Client = nil
 
-	uc := NewAccountUsecase(mockRepo, cryptoSvc, oauthSvc, openaiSvc, oauthManager, rdb, logger)
+	// Create mock CircuitBreakerUsecase (nil for unit tests - not used in basic account operations)
+	var mockCircuitBreaker *CircuitBreakerUsecase = nil
+
+	uc := NewAccountUsecase(mockRepo, cryptoSvc, oauthSvc, openaiSvc, oauthManager, mockCircuitBreaker, rdb, logger)
 	return uc, mockRepo, cryptoSvc
 }
 

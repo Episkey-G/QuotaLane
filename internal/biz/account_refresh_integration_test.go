@@ -94,7 +94,7 @@ func setupTestSuite(t *testing.T) *IntegrationTestSuite {
 	accountRepo := data.NewAccountRepo(dataWrapper, db, logger)
 
 	// 9. Create account usecase
-	uc := NewAccountUsecase(accountRepo, cryptoSvc, oauthSvc, rdb, logger)
+	uc := NewAccountUsecase(accountRepo, cryptoSvc, oauthSvc, nil, nil, nil, rdb, logger)
 
 	return &IntegrationTestSuite{
 		db:          db,
@@ -151,7 +151,7 @@ func TestRefreshClaudeToken_Success(t *testing.T) {
 	mockOAuthSvc := oauth.NewOAuthServiceWithConfig(mockServer.URL+"/v1/oauth/token", 30*time.Second, 3)
 
 	// Replace the usecase with one using the mock OAuth service
-	suite.uc = NewAccountUsecase(suite.accountRepo, suite.crypto, mockOAuthSvc, suite.rdb, suite.logger)
+	suite.uc = NewAccountUsecase(suite.accountRepo, suite.crypto, mockOAuthSvc, nil, nil, nil, suite.rdb, suite.logger)
 
 	// 2. Create test account with expiring OAuth data
 	oldAccessToken := "old_access_token_abcde"
@@ -234,7 +234,7 @@ func TestRefreshClaudeToken_Failure(t *testing.T) {
 
 	// Create OAuth service with mock server endpoint
 	mockOAuthSvc := oauth.NewOAuthServiceWithConfig(mockServer.URL+"/v1/oauth/token", 30*time.Second, 3)
-	suite.uc = NewAccountUsecase(suite.accountRepo, suite.crypto, mockOAuthSvc, suite.rdb, suite.logger)
+	suite.uc = NewAccountUsecase(suite.accountRepo, suite.crypto, mockOAuthSvc, nil, nil, nil, suite.rdb, suite.logger)
 
 	// 2. Create test account
 	oauthData := OAuthData{
@@ -300,7 +300,7 @@ func TestRefreshClaudeToken_ConsecutiveFailures(t *testing.T) {
 
 	// Create OAuth service with mock server endpoint
 	mockOAuthSvc := oauth.NewOAuthServiceWithConfig(mockServer.URL+"/v1/oauth/token", 30*time.Second, 3)
-	suite.uc = NewAccountUsecase(suite.accountRepo, suite.crypto, mockOAuthSvc, suite.rdb, suite.logger)
+	suite.uc = NewAccountUsecase(suite.accountRepo, suite.crypto, mockOAuthSvc, nil, nil, nil, suite.rdb, suite.logger)
 
 	// Create test account
 	oauthData := OAuthData{
@@ -379,7 +379,7 @@ func TestAutoRefreshTokens_BatchProcessing(t *testing.T) {
 
 	// Create OAuth service with mock server endpoint
 	mockOAuthSvc := oauth.NewOAuthServiceWithConfig(mockServer.URL+"/v1/oauth/token", 30*time.Second, 3)
-	suite.uc = NewAccountUsecase(suite.accountRepo, suite.crypto, mockOAuthSvc, suite.rdb, suite.logger)
+	suite.uc = NewAccountUsecase(suite.accountRepo, suite.crypto, mockOAuthSvc, nil, nil, nil, suite.rdb, suite.logger)
 
 	// Create 10 expiring accounts (will expire in 5 minutes)
 	expiresAt := time.Now().UTC().Add(5 * time.Minute)
@@ -483,7 +483,7 @@ func TestAutoRefreshTokens_PartialFailures(t *testing.T) {
 
 	// Create OAuth service with mock server endpoint
 	mockOAuthSvc := oauth.NewOAuthServiceWithConfig(mockServer.URL+"/v1/oauth/token", 30*time.Second, 3)
-	suite.uc = NewAccountUsecase(suite.accountRepo, suite.crypto, mockOAuthSvc, suite.rdb, suite.logger)
+	suite.uc = NewAccountUsecase(suite.accountRepo, suite.crypto, mockOAuthSvc, nil, nil, nil, suite.rdb, suite.logger)
 
 	expiresAt := time.Now().UTC().Add(5 * time.Minute)
 

@@ -15,7 +15,7 @@ import (
 
 // OAuthRefreshTask Token 自动刷新任务
 type OAuthRefreshTask struct {
-	repo         data.AccountRepo
+	repo         AccountRepo
 	oauthManager *oauth.OAuthManager
 	crypto       *crypto.AESCrypto
 	logger       *log.Helper
@@ -23,7 +23,7 @@ type OAuthRefreshTask struct {
 
 // NewOAuthRefreshTask 创建 Token 刷新任务
 func NewOAuthRefreshTask(
-	repo data.AccountRepo,
+	repo AccountRepo,
 	oauthManager *oauth.OAuthManager,
 	crypto *crypto.AESCrypto,
 	logger log.Logger,

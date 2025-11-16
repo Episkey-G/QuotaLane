@@ -112,7 +112,7 @@ func main() {
 
 // setupCronJobs configures and returns the cron scheduler.
 // The scheduler runs AutoRefreshTokens every 5 minutes and concurrency cleanup every minute.
-func setupCronJobs(accountUC *biz.AccountUsecase, oauthRefreshTask *biz.OAuthRefreshTask, rateLimiter *biz.RateLimiterUseCase, accountRepo data.AccountRepo, logger log.Logger) *cron.Cron {
+func setupCronJobs(accountUC *biz.AccountUsecase, oauthRefreshTask *biz.OAuthRefreshTask, rateLimiter *biz.RateLimiterUseCase, accountRepo biz.AccountRepo, logger log.Logger) *cron.Cron {
 	helper := zapLogger.NewLogHelper(logger)
 
 	// Create cron scheduler with seconds support for unified OAuth refresh

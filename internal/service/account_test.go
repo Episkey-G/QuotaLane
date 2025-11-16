@@ -68,7 +68,7 @@ func (m *MockAccountRepo) UpdateOAuthData(ctx context.Context, accountID int64, 
 	return args.Error(0)
 }
 
-func (m *MockAccountRepo) UpdateHealthScore(ctx context.Context, accountID int64, score int32) error {
+func (m *MockAccountRepo) UpdateHealthScore(ctx context.Context, accountID int64, score int) error {
 	args := m.Called(ctx, accountID, score)
 	return args.Error(0)
 }
@@ -128,8 +128,11 @@ func setupTestService(t *testing.T) (*AccountService, *MockAccountRepo) {
 	// Create mock OAuth manager (nil for unit tests)
 	var mockOAuthManager *oauth.OAuthManager = nil
 
+	// Create mock CircuitBreakerUsecase (nil for unit tests - not used in these service layer tests)
+	var mockCircuitBreaker *biz.CircuitBreakerUsecase = nil
+
 	// Create real usecase with mock dependencies
-	uc := biz.NewAccountUsecase(mockRepo, cryptoSvc, mockOAuth, mockOpenAI, mockOAuthManager, rdb, logger)
+	uc := biz.NewAccountUsecase(mockRepo, cryptoSvc, mockOAuth, mockOpenAI, mockOAuthManager, mockCircuitBreaker, rdb, logger)
 
 	// Create service with real usecase
 	svc := NewAccountService(uc, logger)

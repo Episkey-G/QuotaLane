@@ -17,25 +17,27 @@ import (
 
 // AccountUsecase implements account business logic.
 type AccountUsecase struct {
-	repo          data.AccountRepo
-	crypto        *crypto.AESCrypto
-	oauth         oauth.OAuthService
-	openaiService openai.OpenAIService
-	oauthManager  *pkgoauth.OAuthManager // 统一 OAuth Manager
-	rdb           *redis.Client
-	logger        *log.Helper
+	repo           AccountRepo
+	crypto         *crypto.AESCrypto
+	oauth          oauth.OAuthService
+	openaiService  openai.OpenAIService
+	oauthManager   *pkgoauth.OAuthManager // 统一 OAuth Manager
+	circuitBreaker *CircuitBreakerUsecase // Circuit breaker for health score management
+	rdb            *redis.Client
+	logger         *log.Helper
 }
 
 // NewAccountUsecase creates a new account usecase.
-func NewAccountUsecase(repo data.AccountRepo, crypto *crypto.AESCrypto, oauth oauth.OAuthService, openaiService openai.OpenAIService, oauthManager *pkgoauth.OAuthManager, rdb *redis.Client, logger log.Logger) *AccountUsecase {
+func NewAccountUsecase(repo AccountRepo, crypto *crypto.AESCrypto, oauth oauth.OAuthService, openaiService openai.OpenAIService, oauthManager *pkgoauth.OAuthManager, circuitBreaker *CircuitBreakerUsecase, rdb *redis.Client, logger log.Logger) *AccountUsecase {
 	return &AccountUsecase{
-		repo:          repo,
-		crypto:        crypto,
-		oauth:         oauth,
-		openaiService: openaiService,
-		oauthManager:  oauthManager,
-		rdb:           rdb,
-		logger:        log.NewHelper(logger),
+		repo:           repo,
+		crypto:         crypto,
+		oauth:          oauth,
+		openaiService:  openaiService,
+		oauthManager:   oauthManager,
+		circuitBreaker: circuitBreaker,
+		rdb:            rdb,
+		logger:         log.NewHelper(logger),
 	}
 }
 
@@ -262,4 +264,23 @@ func (uc *AccountUsecase) maskSensitiveFields(account *v1.Account) {
 	if account.OAuthDataEncrypted != "" {
 		account.OAuthDataEncrypted = "[ENCRYPTED]"
 	}
+}
+
+// ResetHealthScoreByAdmin resets account health score to 100 (admin operation).
+// Integrates with CircuitBreakerUsecase to handle health score reset properly.
+func (uc *AccountUsecase) ResetHealthScoreByAdmin(ctx context.Context, accountID int64) (*v1.Account, error) {
+	// Use CircuitBreakerUsecase to reset health score (also resets circuit breaker if needed)
+	if err := uc.circuitBreaker.ResetHealthScore(ctx, accountID); err != nil {
+		return nil, fmt.Errorf("failed to reset health score: %w", err)
+	}
+
+	// Get updated account
+	account, err := uc.GetAccount(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account after reset: %w", err)
+	}
+
+	uc.logger.Infow("health score reset by admin", "account_id", accountID)
+
+	return account, nil
 }

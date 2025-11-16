@@ -73,7 +73,7 @@ func (m *mockAccountRepo) UpdateOAuthData(ctx context.Context, accountID int64, 
 	return nil
 }
 
-func (m *mockAccountRepo) UpdateHealthScore(ctx context.Context, accountID int64, score int32) error {
+func (m *mockAccountRepo) UpdateHealthScore(ctx context.Context, accountID int64, score int) error {
 	return nil
 }
 

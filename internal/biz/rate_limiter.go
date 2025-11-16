@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"QuotaLane/internal/data"
-
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -15,12 +13,12 @@ import (
 // It provides RPM (Requests Per Minute), TPM (Tokens Per Minute) rate limiting,
 // and concurrency control using Redis-based counters and sorted sets.
 type RateLimiterUseCase struct {
-	repo   data.RateLimitRepo
+	repo   RateLimitRepo
 	logger *log.Helper
 }
 
 // NewRateLimiterUseCase creates a new rate limiter use case.
-func NewRateLimiterUseCase(repo data.RateLimitRepo, logger log.Logger) *RateLimiterUseCase {
+func NewRateLimiterUseCase(repo RateLimitRepo, logger log.Logger) *RateLimiterUseCase {
 	return &RateLimiterUseCase{
 		repo:   repo,
 		logger: log.NewHelper(logger),
