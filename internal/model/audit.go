@@ -1,3 +1,4 @@
+// Package model defines domain models for audit events and shared constants.
 package model
 
 // Audit event type constants

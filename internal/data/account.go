@@ -217,7 +217,7 @@ func (a *Account) ToProto() *v1.Account {
 		OAuthDataEncrypted: a.OAuthDataEncrypted,
 		RpmLimit:           a.RpmLimit,
 		TpmLimit:           a.TpmLimit,
-		HealthScore:        int32(a.HealthScore),
+		HealthScore:        int32(a.HealthScore), // #nosec G115 -- HealthScore is bounded 0-100
 		IsCircuitBroken:    a.IsCircuitBroken,
 		Status:             StatusToProto(a.Status),
 		Metadata:           metadataStr,
