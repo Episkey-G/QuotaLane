@@ -307,8 +307,8 @@ func (uc *CircuitBreakerUsecase) IsHalfOpen(ctx context.Context, accountID int64
 
 	// Check if backoff time has been reached
 	backoffTime, err := uc.repo.GetBackoffTime(ctx, accountID)
-	if err != nil {
-		// If no backoff time set, default to 5 minutes from circuit broken time
+	if err != nil || backoffTime == nil {
+		// If no backoff time set (nil) or error, default to 5 minutes from circuit broken time
 		backoffTime = &time.Time{}
 		*backoffTime = state.CircuitBrokenAt.Add(5 * time.Minute)
 	}
