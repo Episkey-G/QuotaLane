@@ -10,6 +10,7 @@ import (
 	"time"
 
 	v1 "QuotaLane/api/v1"
+
 	pkgerrors "QuotaLane/pkg/errors"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -62,10 +63,12 @@ type Account struct {
 	Organizations         string        `gorm:"column:organizations;type:text"` // JSON array
 	RpmLimit              int32         `gorm:"column:rpm_limit;default:0;not null"`
 	TpmLimit              int32         `gorm:"column:tpm_limit;default:0;not null"`
-	HealthScore           int32         `gorm:"column:health_score;default:100;not null"`
+	HealthScore           int           `gorm:"column:health_score;default:100;not null"`
 	IsCircuitBroken       bool          `gorm:"column:is_circuit_broken;default:false;not null"`
 	Status                AccountStatus `gorm:"column:status;type:enum('created','active','inactive','error');default:'active';not null"`
 	Metadata              *string       `gorm:"column:metadata;type:json"`                    // JSON string (pointer for NULL support)
+	Version               int32         `gorm:"column:version;default:1;not null"`            // 乐观锁版本号
+	CircuitBrokenAt       *time.Time    `gorm:"column:circuit_broken_at"`                     // 熔断触发时间
 	LastError             *string       `gorm:"column:last_error;type:text"`                  // 最后一次错误信息（JSON，pointer for NULL support）
 	LastErrorAt           *time.Time    `gorm:"column:last_error_at"`                         // 最后一次错误发生时间
 	ConsecutiveErrors     int32         `gorm:"column:consecutive_errors;default:0;not null"` // 连续失败次数
@@ -214,7 +217,7 @@ func (a *Account) ToProto() *v1.Account {
 		OAuthDataEncrypted: a.OAuthDataEncrypted,
 		RpmLimit:           a.RpmLimit,
 		TpmLimit:           a.TpmLimit,
-		HealthScore:        a.HealthScore,
+		HealthScore:        int32(a.HealthScore), // #nosec G115 -- HealthScore is bounded 0-100
 		IsCircuitBroken:    a.IsCircuitBroken,
 		Status:             StatusToProto(a.Status),
 		Metadata:           metadataStr,
@@ -247,21 +250,6 @@ func (a *Account) MaskSensitiveData() {
 	}
 }
 
-// AccountRepo defines the account repository interface.
-type AccountRepo interface {
-	CreateAccount(ctx context.Context, account *Account) error
-	GetAccount(ctx context.Context, id int64) (*Account, error)
-	ListAccounts(ctx context.Context, filter *AccountFilter) ([]*Account, int32, error)
-	UpdateAccount(ctx context.Context, account *Account) error
-	DeleteAccount(ctx context.Context, id int64) error
-	ListExpiringAccounts(ctx context.Context, expiryThreshold time.Time) ([]*Account, error)
-	ListAccountsByProvider(ctx context.Context, provider AccountProvider, status AccountStatus) ([]*Account, error)
-	ListCodexCLIAccountsNeedingRefresh(ctx context.Context) ([]*Account, error)
-	UpdateOAuthData(ctx context.Context, accountID int64, oauthData string, expiresAt time.Time) error
-	UpdateHealthScore(ctx context.Context, accountID int64, score int32) error
-	UpdateAccountStatus(ctx context.Context, accountID int64, status AccountStatus) error
-}
-
 // AccountFilter defines query filter for listing accounts.
 type AccountFilter struct {
 	Page     int32           // Page number (starts from 1)
@@ -270,8 +258,9 @@ type AccountFilter struct {
 	Status   AccountStatus   // Filter by status (optional)
 }
 
-// accountRepo implements AccountRepo interface.
-type accountRepo struct {
+// AccountRepo implements biz.AccountRepo interface.
+// Following Kratos v2 DDD architecture, interface is defined in biz layer.
+type AccountRepo struct {
 	data   *Data
 	db     *gorm.DB
 	cache  CacheClient
@@ -279,8 +268,8 @@ type accountRepo struct {
 }
 
 // NewAccountRepo creates a new account repository.
-func NewAccountRepo(data *Data, db *gorm.DB, logger log.Logger) AccountRepo {
-	return &accountRepo{
+func NewAccountRepo(data *Data, db *gorm.DB, logger log.Logger) *AccountRepo {
+	return &AccountRepo{
 		data:   data,
 		db:     db,
 		cache:  data.GetCache(),
@@ -290,7 +279,7 @@ func NewAccountRepo(data *Data, db *gorm.DB, logger log.Logger) AccountRepo {
 
 // CreateAccount creates a new account in the database.
 // Returns classified database errors for better error handling in upper layers.
-func (r *accountRepo) CreateAccount(ctx context.Context, account *Account) error {
+func (r *AccountRepo) CreateAccount(ctx context.Context, account *Account) error {
 	if err := r.db.WithContext(ctx).Create(account).Error; err != nil {
 		// Classify the database error for better error handling
 		dbErr := pkgerrors.ClassifyDBError(err)
@@ -326,7 +315,7 @@ func (r *accountRepo) CreateAccount(ctx context.Context, account *Account) error
 
 // GetAccount retrieves an account by ID with caching.
 // Cache key: "account:{id}", TTL: 5 minutes
-func (r *accountRepo) GetAccount(ctx context.Context, id int64) (*Account, error) {
+func (r *AccountRepo) GetAccount(ctx context.Context, id int64) (*Account, error) {
 	cacheKey := fmt.Sprintf("account:%d", id)
 
 	// Try to get from cache first
@@ -357,7 +346,7 @@ func (r *accountRepo) GetAccount(ctx context.Context, id int64) (*Account, error
 }
 
 // ListAccounts retrieves accounts with pagination and filters.
-func (r *accountRepo) ListAccounts(ctx context.Context, filter *AccountFilter) ([]*Account, int32, error) {
+func (r *AccountRepo) ListAccounts(ctx context.Context, filter *AccountFilter) ([]*Account, int32, error) {
 	if filter == nil {
 		filter = &AccountFilter{Page: 1, PageSize: 20}
 	}
@@ -414,7 +403,7 @@ func (r *accountRepo) ListAccounts(ctx context.Context, filter *AccountFilter) (
 }
 
 // UpdateAccount updates an account and clears its cache.
-func (r *accountRepo) UpdateAccount(ctx context.Context, account *Account) error {
+func (r *AccountRepo) UpdateAccount(ctx context.Context, account *Account) error {
 	account.UpdatedAt = time.Now()
 
 	if err := r.db.WithContext(ctx).Save(account).Error; err != nil {
@@ -433,7 +422,7 @@ func (r *accountRepo) UpdateAccount(ctx context.Context, account *Account) error
 }
 
 // DeleteAccount performs soft delete (sets status to INACTIVE) and clears cache.
-func (r *accountRepo) DeleteAccount(ctx context.Context, id int64) error {
+func (r *AccountRepo) DeleteAccount(ctx context.Context, id int64) error {
 	result := r.db.WithContext(ctx).
 		Model(&Account{}).
 		Where("id = ?", id).
@@ -490,7 +479,7 @@ func ValidateMetadataJSON(metadata string) error {
 // ListExpiringAccounts 查询即将过期的 Claude 账户
 // expiryThreshold: 过期时间阈值（如 time.Now().Add(10 * time.Minute)）
 // 返回 oauth_expires_at <= expiryThreshold 的 active 状态 Claude 账户
-func (r *accountRepo) ListExpiringAccounts(ctx context.Context, expiryThreshold time.Time) ([]*Account, error) {
+func (r *AccountRepo) ListExpiringAccounts(ctx context.Context, expiryThreshold time.Time) ([]*Account, error) {
 	var accounts []*Account
 
 	// SQL: WHERE provider IN ('claude-official', 'claude-console')
@@ -519,7 +508,7 @@ func (r *accountRepo) ListExpiringAccounts(ctx context.Context, expiryThreshold 
 // accountID: 账户 ID
 // oauthData: 加密后的 OAuth 数据（Base64 编码）
 // expiresAt: OAuth Token 过期时间
-func (r *accountRepo) UpdateOAuthData(ctx context.Context, accountID int64, oauthData string, expiresAt time.Time) error {
+func (r *AccountRepo) UpdateOAuthData(ctx context.Context, accountID int64, oauthData string, expiresAt time.Time) error {
 	updates := map[string]interface{}{
 		"oauth_data_encrypted": oauthData,
 		"oauth_expires_at":     expiresAt,
@@ -554,7 +543,7 @@ func (r *accountRepo) UpdateOAuthData(ctx context.Context, accountID int64, oaut
 // accountID: 账户 ID
 // score: 新的健康分数（0-100）
 // 使用 GREATEST(0, LEAST(100, ?)) 确保分数在 [0, 100] 范围内
-func (r *accountRepo) UpdateHealthScore(ctx context.Context, accountID int64, score int32) error {
+func (r *AccountRepo) UpdateHealthScore(ctx context.Context, accountID int64, score int) error {
 	// SQL: UPDATE api_accounts
 	//      SET health_score = GREATEST(0, LEAST(100, ?)),
 	//          updated_at = NOW()
@@ -589,7 +578,7 @@ func (r *accountRepo) UpdateHealthScore(ctx context.Context, accountID int64, sc
 // UpdateAccountStatus 更新账户状态
 // accountID: 账户 ID
 // status: 新状态（active/inactive/error）
-func (r *accountRepo) UpdateAccountStatus(ctx context.Context, accountID int64, status AccountStatus) error {
+func (r *AccountRepo) UpdateAccountStatus(ctx context.Context, accountID int64, status AccountStatus) error {
 	result := r.db.WithContext(ctx).
 		Model(&Account{}).
 		Where("id = ?", accountID).
@@ -621,7 +610,7 @@ func (r *accountRepo) UpdateAccountStatus(ctx context.Context, accountID int64, 
 // provider: Provider 类型（如 ProviderOpenAIResponses）
 // status: 账户状态（如 StatusActive）
 // 返回符合条件的账户列表（按 ID 升序排列）
-func (r *accountRepo) ListAccountsByProvider(ctx context.Context, provider AccountProvider, status AccountStatus) ([]*Account, error) {
+func (r *AccountRepo) ListAccountsByProvider(ctx context.Context, provider AccountProvider, status AccountStatus) ([]*Account, error) {
 	var accounts []*Account
 
 	// SQL: SELECT * FROM api_accounts
@@ -645,7 +634,7 @@ func (r *accountRepo) ListAccountsByProvider(ctx context.Context, provider Accou
 
 // ListCodexCLIAccountsNeedingRefresh 查询需要刷新 token 的 Codex CLI 账户
 // 查询条件：provider='codex-cli' AND status='active' AND token_expires_at < now() + 5分钟
-func (r *accountRepo) ListCodexCLIAccountsNeedingRefresh(ctx context.Context) ([]*Account, error) {
+func (r *AccountRepo) ListCodexCLIAccountsNeedingRefresh(ctx context.Context) ([]*Account, error) {
 	var accounts []*Account
 
 	// Token 即将在 5 分钟内过期

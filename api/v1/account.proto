@@ -93,6 +93,14 @@ service AccountService {
       body: "*"
     };
   }
+
+  // ResetHealthScore 重置账号健康分数（管理员操作）
+  rpc ResetHealthScore(ResetHealthScoreRequest) returns (ResetHealthScoreResponse) {
+    option (google.api.http) = {
+      post: "/ResetHealthScore"
+      body: "*"
+    };
+  }
 }
 
 // AccountProvider AI服务提供商枚举
@@ -303,4 +311,16 @@ message PollOAuthStatusResponse {
   OAuthStatusEnum Status = 2;      // 授权状态
   string Message = 3;              // 提示信息
   optional int64 AccountId = 4;    // 账户 ID（授权成功时返回）
+}
+
+// ========== Story 2.5: 健康分数和熔断机制 ==========
+
+// ResetHealthScoreRequest 重置账号健康分数请求
+message ResetHealthScoreRequest {
+  int64 Id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户 ID（必填，> 0）
+}
+
+// ResetHealthScoreResponse 重置账号健康分数响应
+message ResetHealthScoreResponse {
+  Account Account = 1;  // 更新后的账户信息
 }

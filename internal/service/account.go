@@ -304,3 +304,20 @@ func containsMiddle(s, substr string) bool {
 func statusError(code codes.Code, msg string) error {
 	return status.Error(code, msg)
 }
+
+// ResetHealthScore resets account health score to 100 (admin operation).
+// Implements Story 2.5 AC#6
+func (s *AccountService) ResetHealthScore(ctx context.Context, req *v1.ResetHealthScoreRequest) (*v1.ResetHealthScoreResponse, error) {
+	s.logger.Infow("ResetHealthScore called", "account_id", req.Id)
+
+	// Call AccountUsecase to reset health score
+	account, err := s.uc.ResetHealthScoreByAdmin(ctx, req.Id)
+	if err != nil {
+		s.logger.Errorw("failed to reset health score", "account_id", req.Id, "error", err)
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to reset health score: %v", err))
+	}
+
+	return &v1.ResetHealthScoreResponse{
+		Account: account,
+	}, nil
+}

@@ -9,32 +9,16 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// RateLimitRepo defines the interface for rate limiting operations.
-type RateLimitRepo interface {
-	// RPM (Requests Per Minute) operations
-	IncrementRPM(ctx context.Context, accountID int64) (int32, error)
-	GetRPMCount(ctx context.Context, accountID int64) (int32, error)
-
-	// TPM (Tokens Per Minute) operations
-	IncrementTPM(ctx context.Context, accountID int64, tokens int32) (int32, error)
-	GetTPMCount(ctx context.Context, accountID int64) (int32, error)
-
-	// Concurrency control operations
-	AddConcurrencyRequest(ctx context.Context, accountID int64, requestID string, timestamp int64) error
-	RemoveConcurrencyRequest(ctx context.Context, accountID int64, requestID string) error
-	GetConcurrencyCount(ctx context.Context, accountID int64) (int32, error)
-	CleanupExpiredConcurrency(ctx context.Context, accountID int64, expiredBefore int64) error
-}
-
-// rateLimitRepo implements RateLimitRepo using Redis.
-type rateLimitRepo struct {
+// RateLimitRepo implements biz.RateLimitRepo interface.
+// Following Kratos v2 DDD architecture, interface is defined in biz layer.
+type RateLimitRepo struct {
 	rdb    *redis.Client
 	logger *log.Helper
 }
 
 // NewRateLimitRepo creates a new rate limit repository.
-func NewRateLimitRepo(rdb *redis.Client, logger log.Logger) RateLimitRepo {
-	return &rateLimitRepo{
+func NewRateLimitRepo(rdb *redis.Client, logger log.Logger) *RateLimitRepo {
+	return &RateLimitRepo{
 		rdb:    rdb,
 		logger: log.NewHelper(logger),
 	}
@@ -43,7 +27,7 @@ func NewRateLimitRepo(rdb *redis.Client, logger log.Logger) RateLimitRepo {
 // IncrementRPM increments the RPM (Requests Per Minute) counter for an account.
 // Uses Redis INCR with automatic expiration (60 seconds) on first increment.
 // Returns the new count and any error.
-func (r *rateLimitRepo) IncrementRPM(ctx context.Context, accountID int64) (int32, error) {
+func (r *RateLimitRepo) IncrementRPM(ctx context.Context, accountID int64) (int32, error) {
 	if r.rdb == nil {
 		return 0, fmt.Errorf("redis client is nil")
 	}
@@ -74,7 +58,7 @@ func (r *rateLimitRepo) IncrementRPM(ctx context.Context, accountID int64) (int3
 
 // GetRPMCount retrieves the current RPM count for an account.
 // Returns 0 if key doesn't exist.
-func (r *rateLimitRepo) GetRPMCount(ctx context.Context, accountID int64) (int32, error) {
+func (r *RateLimitRepo) GetRPMCount(ctx context.Context, accountID int64) (int32, error) {
 	if r.rdb == nil {
 		return 0, fmt.Errorf("redis client is nil")
 	}
@@ -102,7 +86,7 @@ func (r *rateLimitRepo) GetRPMCount(ctx context.Context, accountID int64) (int32
 // IncrementTPM increments the TPM (Tokens Per Minute) counter for an account.
 // Uses Redis INCRBY with automatic expiration (60 seconds) on first increment.
 // Returns the new count and any error.
-func (r *rateLimitRepo) IncrementTPM(ctx context.Context, accountID int64, tokens int32) (int32, error) {
+func (r *RateLimitRepo) IncrementTPM(ctx context.Context, accountID int64, tokens int32) (int32, error) {
 	if r.rdb == nil {
 		return 0, fmt.Errorf("redis client is nil")
 	}
@@ -136,7 +120,7 @@ func (r *rateLimitRepo) IncrementTPM(ctx context.Context, accountID int64, token
 
 // GetTPMCount retrieves the current TPM count for an account.
 // Returns 0 if key doesn't exist.
-func (r *rateLimitRepo) GetTPMCount(ctx context.Context, accountID int64) (int32, error) {
+func (r *RateLimitRepo) GetTPMCount(ctx context.Context, accountID int64) (int32, error) {
 	if r.rdb == nil {
 		return 0, fmt.Errorf("redis client is nil")
 	}
@@ -163,7 +147,7 @@ func (r *rateLimitRepo) GetTPMCount(ctx context.Context, accountID int64) (int32
 
 // AddConcurrencyRequest adds a request to the concurrency tracking sorted set.
 // Uses Redis ZADD with the timestamp as score.
-func (r *rateLimitRepo) AddConcurrencyRequest(ctx context.Context, accountID int64, requestID string, timestamp int64) error {
+func (r *RateLimitRepo) AddConcurrencyRequest(ctx context.Context, accountID int64, requestID string, timestamp int64) error {
 	if r.rdb == nil {
 		return fmt.Errorf("redis client is nil")
 	}
@@ -183,7 +167,7 @@ func (r *rateLimitRepo) AddConcurrencyRequest(ctx context.Context, accountID int
 
 // RemoveConcurrencyRequest removes a request from the concurrency tracking sorted set.
 // Uses Redis ZREM.
-func (r *rateLimitRepo) RemoveConcurrencyRequest(ctx context.Context, accountID int64, requestID string) error {
+func (r *RateLimitRepo) RemoveConcurrencyRequest(ctx context.Context, accountID int64, requestID string) error {
 	if r.rdb == nil {
 		return fmt.Errorf("redis client is nil")
 	}
@@ -200,7 +184,7 @@ func (r *rateLimitRepo) RemoveConcurrencyRequest(ctx context.Context, accountID 
 
 // GetConcurrencyCount retrieves the current concurrency count for an account.
 // Uses Redis ZCARD to count members in the sorted set.
-func (r *rateLimitRepo) GetConcurrencyCount(ctx context.Context, accountID int64) (int32, error) {
+func (r *RateLimitRepo) GetConcurrencyCount(ctx context.Context, accountID int64) (int32, error) {
 	if r.rdb == nil {
 		return 0, fmt.Errorf("redis client is nil")
 	}
@@ -223,7 +207,7 @@ func (r *rateLimitRepo) GetConcurrencyCount(ctx context.Context, accountID int64
 
 // CleanupExpiredConcurrency removes expired requests from the concurrency tracking sorted set.
 // Uses Redis ZREMRANGEBYSCORE to remove requests older than expiredBefore timestamp.
-func (r *rateLimitRepo) CleanupExpiredConcurrency(ctx context.Context, accountID int64, expiredBefore int64) error {
+func (r *RateLimitRepo) CleanupExpiredConcurrency(ctx context.Context, accountID int64, expiredBefore int64) error {
 	if r.rdb == nil {
 		return fmt.Errorf("redis client is nil")
 	}

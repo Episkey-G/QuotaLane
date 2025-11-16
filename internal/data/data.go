@@ -16,8 +16,8 @@ var ProviderSet = wire.NewSet(
 	NewRedisClient,
 	NewCacheClient,
 	NewMySQLClient,
-	NewAccountRepo,
-	NewRateLimitRepo,
+	// Note: All repository providers (NewAccountRepo, NewRateLimitRepo, NewCircuitBreakerRepo, etc.)
+	// are provided in biz.ProviderSet along with wire.Bind to follow Kratos v2 DDD architecture
 )
 
 // Data contains all data layer dependencies.
