@@ -385,10 +385,17 @@ func (s *AccountService) GetAccountGroup(ctx context.Context, req *v1.GetAccount
 	// Convert accounts to Proto (simplified version)
 	protoAccounts := make([]*v1.Account, len(accounts))
 	for i, acc := range accounts {
+		// Safe conversion: clamp health score to int32 range [0, 100]
+		healthScore := acc.HealthScore
+		if healthScore < 0 {
+			healthScore = 0
+		} else if healthScore > 100 {
+			healthScore = 100
+		}
 		protoAccounts[i] = &v1.Account{
 			Id:          acc.ID,
 			Name:        acc.Name,
-			HealthScore: int32(acc.HealthScore),
+			HealthScore: int32(healthScore), // #nosec G115 - clamped to valid range
 			// Add other fields as needed
 		}
 	}
