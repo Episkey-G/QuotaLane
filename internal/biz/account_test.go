@@ -127,7 +127,10 @@ func setupTestUsecase(t *testing.T) (*AccountUsecase, *MockAccountRepo, *crypto.
 	// Create mock CircuitBreakerUsecase (nil for unit tests - not used in basic account operations)
 	var mockCircuitBreaker *CircuitBreakerUsecase = nil
 
-	uc := NewAccountUsecase(mockRepo, cryptoSvc, oauthSvc, openaiSvc, oauthManager, mockCircuitBreaker, rdb, logger)
+	// Create mock AccountGroupUseCase (nil for unit tests - not used in basic account operations)
+	var mockAccountGroupUC *AccountGroupUseCase = nil
+
+	uc := NewAccountUsecase(mockRepo, cryptoSvc, oauthSvc, openaiSvc, oauthManager, mockCircuitBreaker, mockAccountGroupUC, rdb, logger)
 	return uc, mockRepo, cryptoSvc
 }
 

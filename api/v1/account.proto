@@ -101,6 +101,48 @@ service AccountService {
       body: "*"
     };
   }
+
+  // ========== Story 2.6: 账户组管理 ==========
+
+  // CreateAccountGroup 创建账户组
+  rpc CreateAccountGroup(CreateAccountGroupRequest) returns (CreateAccountGroupResponse) {
+    option (google.api.http) = {
+      post: "/CreateAccountGroup"
+      body: "*"
+    };
+  }
+
+  // ListAccountGroups 查询账户组列表
+  rpc ListAccountGroups(ListAccountGroupsRequest) returns (ListAccountGroupsResponse) {
+    option (google.api.http) = {
+      post: "/ListAccountGroups"
+      body: "*"
+    };
+  }
+
+  // GetAccountGroup 获取账户组详情（包含账户详情）
+  rpc GetAccountGroup(GetAccountGroupRequest) returns (GetAccountGroupResponse) {
+    option (google.api.http) = {
+      post: "/GetAccountGroup"
+      body: "*"
+    };
+  }
+
+  // UpdateAccountGroup 更新账户组
+  rpc UpdateAccountGroup(UpdateAccountGroupRequest) returns (UpdateAccountGroupResponse) {
+    option (google.api.http) = {
+      post: "/UpdateAccountGroup"
+      body: "*"
+    };
+  }
+
+  // DeleteAccountGroup 删除账户组（软删除）
+  rpc DeleteAccountGroup(DeleteAccountGroupRequest) returns (DeleteAccountGroupResponse) {
+    option (google.api.http) = {
+      post: "/DeleteAccountGroup"
+      body: "*"
+    };
+  }
 }
 
 // AccountProvider AI服务提供商枚举
@@ -323,4 +365,80 @@ message ResetHealthScoreRequest {
 // ResetHealthScoreResponse 重置账号健康分数响应
 message ResetHealthScoreResponse {
   Account Account = 1;  // 更新后的账户信息
+}
+
+// ========== Story 2.6: 账户组管理消息定义 ==========
+
+// AccountGroup 账户组信息
+message AccountGroup {
+  int64 Id = 1;                                 // 账户组ID
+  string Name = 2;                              // 组名称
+  string Description = 3;                       // 组描述
+  int32 Priority = 4;                           // 优先级（数字越大优先级越高）
+  repeated int64 AccountIds = 5;                // 账户ID列表
+  google.protobuf.Timestamp CreatedAt = 6;      // 创建时间
+  google.protobuf.Timestamp UpdatedAt = 7;      // 更新时间
+}
+
+// CreateAccountGroupRequest 创建账户组请求
+message CreateAccountGroupRequest {
+  string Name = 1 [(validate.rules).string = {min_len: 1, max_len: 100}];  // 组名称（必填，1-100字符）
+  string Description = 2;                        // 组描述（可选）
+  int32 Priority = 3 [(validate.rules).int32 = {gte: 0}];  // 优先级（可选，默认0）
+  repeated int64 AccountIds = 4;                 // 账户ID列表（可选）
+}
+
+// CreateAccountGroupResponse 创建账户组响应
+message CreateAccountGroupResponse {
+  AccountGroup Group = 1;  // 创建的账户组信息
+}
+
+// ListAccountGroupsRequest 查询账户组列表请求
+message ListAccountGroupsRequest {
+  int32 Page = 1 [(validate.rules).int32 = {gte: 1}];              // 页码（从1开始）
+  int32 PageSize = 2 [(validate.rules).int32 = {gte: 1, lte: 100}];  // 每页数量（1-100）
+}
+
+// ListAccountGroupsResponse 查询账户组列表响应
+message ListAccountGroupsResponse {
+  repeated AccountGroup Groups = 1;  // 账户组列表
+  int64 Total = 2;                   // 总数量
+  int32 Page = 3;                    // 当前页码
+  int32 PageSize = 4;                // 每页数量
+}
+
+// GetAccountGroupRequest 获取账户组详情请求
+message GetAccountGroupRequest {
+  int64 Id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户组ID（必填，> 0）
+}
+
+// GetAccountGroupResponse 获取账户组详情响应
+message GetAccountGroupResponse {
+  AccountGroup Group = 1;            // 账户组信息
+  repeated Account Accounts = 2;     // 账户详情列表（包含组内所有账户）
+}
+
+// UpdateAccountGroupRequest 更新账户组请求
+message UpdateAccountGroupRequest {
+  int64 Id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户组ID（必填，> 0）
+  optional string Name = 2 [(validate.rules).string = {max_len: 100}];  // 组名称（可选）
+  optional string Description = 3;    // 组描述（可选）
+  optional int32 Priority = 4 [(validate.rules).int32 = {gte: 0}];  // 优先级（可选）
+  repeated int64 AccountIds = 5;      // 账户ID列表（可选，传空数组清空成员）
+}
+
+// UpdateAccountGroupResponse 更新账户组响应
+message UpdateAccountGroupResponse {
+  AccountGroup Group = 1;  // 更新后的账户组信息
+}
+
+// DeleteAccountGroupRequest 删除账户组请求
+message DeleteAccountGroupRequest {
+  int64 Id = 1 [(validate.rules).int64 = {gt: 0}];  // 账户组ID（必填，> 0）
+}
+
+// DeleteAccountGroupResponse 删除账户组响应
+message DeleteAccountGroupResponse {
+  bool Success = 1;  // 是否成功
+  string Message = 2;  // 提示信息
 }
