@@ -409,7 +409,15 @@ func (s *AccountService) UpdateAccountGroup(ctx context.Context, req *v1.UpdateA
 	description := req.GetDescription()
 	priority := req.GetPriority()
 
-	err := s.uc.GetAccountGroupUseCase().UpdateAccountGroup(ctx, req.Id, name, description, priority, req.AccountIds)
+	// IMPORTANT: In Proto3, omitted repeated fields become empty slices, not nil.
+	// Current API design: passing empty AccountIds clears all members (documented in Proto).
+	// To preserve existing members, client MUST explicitly GET current members first and pass them back.
+	accountIDs := req.AccountIds
+	if accountIDs == nil {
+		accountIDs = []int64{} // Ensure non-nil for consistency
+	}
+
+	err := s.uc.GetAccountGroupUseCase().UpdateAccountGroup(ctx, req.Id, name, description, priority, accountIDs)
 	if err != nil {
 		s.logger.Errorw("failed to update account group", "id", req.Id, "error", err)
 		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to update account group: %v", err))

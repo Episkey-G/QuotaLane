@@ -119,7 +119,12 @@ func (r *AccountGroupRepo) CreateGroup(ctx context.Context, name string, descrip
 		return 0, err
 	}
 
-	// Cache the new group
+	// Update group ID from database-generated value
+	group.ID = dbGroup.ID
+	group.CreatedAt = dbGroup.CreatedAt
+	group.UpdatedAt = dbGroup.UpdatedAt
+
+	// Cache the new group with correct ID
 	r.cacheGroup(ctx, dbGroup.ID, group)
 
 	// Cache group IDs for each account
@@ -132,14 +137,16 @@ func (r *AccountGroupRepo) CreateGroup(ctx context.Context, name string, descrip
 
 // GetGroup retrieves a group by ID with member account IDs.
 func (r *AccountGroupRepo) GetGroup(ctx context.Context, id int64) (*AccountGroupData, error) {
-	// Try cache first
-	cacheKey := fmt.Sprintf("group:%d", id)
-	cached, err := r.data.GetRedisClient().Get(ctx, cacheKey).Result()
-	if err == nil {
-		var group AccountGroupData
-		if err := json.Unmarshal([]byte(cached), &group); err == nil {
-			r.log.Debugf("cache hit for group %d", id)
-			return &group, nil
+	// Try cache first (if Redis is available)
+	if rdb := r.data.GetRedisClient(); rdb != nil {
+		cacheKey := fmt.Sprintf("group:%d", id)
+		cached, err := rdb.Get(ctx, cacheKey).Result()
+		if err == nil {
+			var group AccountGroupData
+			if err := json.Unmarshal([]byte(cached), &group); err == nil {
+				r.log.Debugf("cache hit for group %d", id)
+				return &group, nil
+			}
 		}
 	}
 
@@ -326,23 +333,25 @@ func (r *AccountGroupRepo) DeleteGroup(ctx context.Context, id int64) error {
 
 // GetAccountGroups retrieves all groups that an account belongs to.
 func (r *AccountGroupRepo) GetAccountGroups(ctx context.Context, accountID int64) ([]*AccountGroupData, error) {
-	// Try cache first
-	cacheKey := fmt.Sprintf("account:%d:groups", accountID)
-	cached, err := r.data.GetRedisClient().Get(ctx, cacheKey).Result()
-	if err == nil {
-		var groupIDs []int64
-		if err := json.Unmarshal([]byte(cached), &groupIDs); err == nil && len(groupIDs) > 0 {
-			// Fetch full group details
-			var groups []*AccountGroupData
-			for _, gid := range groupIDs {
-				group, err := r.GetGroup(ctx, gid)
-				if err == nil {
-					groups = append(groups, group)
+	// Try cache first (if Redis is available)
+	if rdb := r.data.GetRedisClient(); rdb != nil {
+		cacheKey := fmt.Sprintf("account:%d:groups", accountID)
+		cached, err := rdb.Get(ctx, cacheKey).Result()
+		if err == nil {
+			var groupIDs []int64
+			if err := json.Unmarshal([]byte(cached), &groupIDs); err == nil && len(groupIDs) > 0 {
+				// Fetch full group details
+				var groups []*AccountGroupData
+				for _, gid := range groupIDs {
+					group, err := r.GetGroup(ctx, gid)
+					if err == nil {
+						groups = append(groups, group)
+					}
 				}
-			}
-			if len(groups) == len(groupIDs) {
-				r.log.Debugf("cache hit for account %d groups", accountID)
-				return groups, nil
+				if len(groups) == len(groupIDs) {
+					r.log.Debugf("cache hit for account %d groups", accountID)
+					return groups, nil
+				}
 			}
 		}
 	}
@@ -373,9 +382,12 @@ func (r *AccountGroupRepo) GetAccountGroups(ctx context.Context, accountID int64
 		groupIDs[i] = g.ID
 	}
 
-	// Cache group IDs (10 minutes TTL)
-	if data, err := json.Marshal(groupIDs); err == nil {
-		r.data.GetRedisClient().Set(ctx, cacheKey, data, 10*time.Minute)
+	// Cache group IDs (10 minutes TTL, if Redis is available)
+	if rdb := r.data.GetRedisClient(); rdb != nil {
+		cacheKey := fmt.Sprintf("account:%d:groups", accountID)
+		if data, err := json.Marshal(groupIDs); err == nil {
+			rdb.Set(ctx, cacheKey, data, 10*time.Minute)
+		}
 	}
 
 	return groups, nil
@@ -403,6 +415,11 @@ func (r *AccountGroupRepo) GetAllGroupedAccountIDs(ctx context.Context) ([]int64
 
 // cacheGroup caches a group for 10 minutes.
 func (r *AccountGroupRepo) cacheGroup(ctx context.Context, id int64, group *AccountGroupData) {
+	rdb := r.data.GetRedisClient()
+	if rdb == nil {
+		return // Redis not available, skip caching
+	}
+
 	cacheKey := fmt.Sprintf("group:%d", id)
 	data, err := json.Marshal(group)
 	if err != nil {
@@ -410,7 +427,7 @@ func (r *AccountGroupRepo) cacheGroup(ctx context.Context, id int64, group *Acco
 		return
 	}
 
-	if err := r.data.GetRedisClient().Set(ctx, cacheKey, data, 10*time.Minute).Err(); err != nil {
+	if err := rdb.Set(ctx, cacheKey, data, 10*time.Minute).Err(); err != nil {
 		// Redis failure is not critical, just log
 		r.log.Warnf("failed to cache group %d: %v", id, err)
 	}
@@ -418,16 +435,26 @@ func (r *AccountGroupRepo) cacheGroup(ctx context.Context, id int64, group *Acco
 
 // invalidateGroupCache removes a group from cache.
 func (r *AccountGroupRepo) invalidateGroupCache(ctx context.Context, id int64) {
+	rdb := r.data.GetRedisClient()
+	if rdb == nil {
+		return // Redis not available, skip invalidation
+	}
+
 	cacheKey := fmt.Sprintf("group:%d", id)
-	if err := r.data.GetRedisClient().Del(ctx, cacheKey).Err(); err != nil && err != redis.Nil {
+	if err := rdb.Del(ctx, cacheKey).Err(); err != nil && err != redis.Nil {
 		r.log.Warnf("failed to invalidate group cache: %v", err)
 	}
 }
 
 // invalidateAccountGroupsCache removes account's groups cache.
 func (r *AccountGroupRepo) invalidateAccountGroupsCache(ctx context.Context, accountID int64) {
+	rdb := r.data.GetRedisClient()
+	if rdb == nil {
+		return // Redis not available, skip invalidation
+	}
+
 	cacheKey := fmt.Sprintf("account:%d:groups", accountID)
-	if err := r.data.GetRedisClient().Del(ctx, cacheKey).Err(); err != nil && err != redis.Nil {
+	if err := rdb.Del(ctx, cacheKey).Err(); err != nil && err != redis.Nil {
 		r.log.Warnf("failed to invalidate account groups cache: %v", err)
 	}
 }
