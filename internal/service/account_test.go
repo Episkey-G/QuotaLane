@@ -131,8 +131,11 @@ func setupTestService(t *testing.T) (*AccountService, *MockAccountRepo) {
 	// Create mock CircuitBreakerUsecase (nil for unit tests - not used in these service layer tests)
 	var mockCircuitBreaker *biz.CircuitBreakerUsecase = nil
 
+	// Create mock AccountGroupUseCase (nil for unit tests - not used in these service layer tests)
+	var mockAccountGroupUC *biz.AccountGroupUseCase = nil
+
 	// Create real usecase with mock dependencies
-	uc := biz.NewAccountUsecase(mockRepo, cryptoSvc, mockOAuth, mockOpenAI, mockOAuthManager, mockCircuitBreaker, rdb, logger)
+	uc := biz.NewAccountUsecase(mockRepo, cryptoSvc, mockOAuth, mockOpenAI, mockOAuthManager, mockCircuitBreaker, mockAccountGroupUC, rdb, logger)
 
 	// Create service with real usecase
 	svc := NewAccountService(uc, logger)

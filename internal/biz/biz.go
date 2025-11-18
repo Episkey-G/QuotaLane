@@ -11,17 +11,20 @@ import (
 // ProviderSet is biz providers.
 var ProviderSet = wire.NewSet(
 	NewAccountUsecase,
+	NewAccountGroupUseCase,
 	NewOAuthRefreshTask,
 	NewRateLimiterUseCase,
 	NewCircuitBreakerUsecase,
 	// Import data layer providers
 	data.NewAccountRepo,
+	data.NewAccountGroupRepo,
 	data.NewRateLimitRepo,
 	data.NewCircuitBreakerRepo,
 	data.NewAuditLogger,
 	data.NewNoopWebhookService,
 	// Bind data layer implementations to biz layer interfaces
 	wire.Bind(new(AccountRepo), new(*data.AccountRepo)),
+	wire.Bind(new(AccountGroupRepo), new(*data.AccountGroupRepo)),
 	wire.Bind(new(RateLimitRepo), new(*data.RateLimitRepo)),
 	wire.Bind(new(CircuitBreakerRepo), new(*data.CircuitBreakerRepo)),
 	wire.Bind(new(AuditLogger), new(*data.AuditLoggerImpl)),

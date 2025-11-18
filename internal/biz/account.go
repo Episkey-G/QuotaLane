@@ -23,12 +23,18 @@ type AccountUsecase struct {
 	openaiService  openai.OpenAIService
 	oauthManager   *pkgoauth.OAuthManager // 统一 OAuth Manager
 	circuitBreaker *CircuitBreakerUsecase // Circuit breaker for health score management
+	groupUseCase   *AccountGroupUseCase   // Account group management
 	rdb            *redis.Client
 	logger         *log.Helper
 }
 
+// GetAccountGroupUseCase returns the account group use case.
+func (uc *AccountUsecase) GetAccountGroupUseCase() *AccountGroupUseCase {
+	return uc.groupUseCase
+}
+
 // NewAccountUsecase creates a new account usecase.
-func NewAccountUsecase(repo AccountRepo, crypto *crypto.AESCrypto, oauth oauth.OAuthService, openaiService openai.OpenAIService, oauthManager *pkgoauth.OAuthManager, circuitBreaker *CircuitBreakerUsecase, rdb *redis.Client, logger log.Logger) *AccountUsecase {
+func NewAccountUsecase(repo AccountRepo, crypto *crypto.AESCrypto, oauth oauth.OAuthService, openaiService openai.OpenAIService, oauthManager *pkgoauth.OAuthManager, circuitBreaker *CircuitBreakerUsecase, groupUseCase *AccountGroupUseCase, rdb *redis.Client, logger log.Logger) *AccountUsecase {
 	return &AccountUsecase{
 		repo:           repo,
 		crypto:         crypto,
@@ -36,6 +42,7 @@ func NewAccountUsecase(repo AccountRepo, crypto *crypto.AESCrypto, oauth oauth.O
 		openaiService:  openaiService,
 		oauthManager:   oauthManager,
 		circuitBreaker: circuitBreaker,
+		groupUseCase:   groupUseCase,
 		rdb:            rdb,
 		logger:         log.NewHelper(logger),
 	}

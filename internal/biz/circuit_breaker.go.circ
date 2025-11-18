@@ -1,0 +1,514 @@
+package biz
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"QuotaLane/internal/data"
+
+	"github.com/go-kratos/kratos/v2/log"
+)
+
+// ErrorType defines the type of error that affects health score
+type ErrorType int
+
+const (
+	ErrorTypeTokenRefreshFailed ErrorType = iota // -20 分
+	ErrorTypeHealthCheckFailed                   // -15 分
+	ErrorTypeRateLimited                         // -10 分
+	ErrorTypeOverloaded                          // -30 分
+	ErrorTypeServerError                         // -5 分
+	ErrorTypeTimeout                             // -5 分
+)
+
+// String returns the string representation of ErrorType
+func (e ErrorType) String() string {
+	switch e {
+	case ErrorTypeTokenRefreshFailed:
+		return "TokenRefreshFailed"
+	case ErrorTypeHealthCheckFailed:
+		return "HealthCheckFailed"
+	case ErrorTypeRateLimited:
+		return "RateLimited"
+	case ErrorTypeOverloaded:
+		return "Overloaded"
+	case ErrorTypeServerError:
+		return "ServerError"
+	case ErrorTypeTimeout:
+		return "Timeout"
+	default:
+		return "Unknown"
+	}
+}
+
+// Delta returns the health score delta for this error type
+func (e ErrorType) Delta() int {
+	switch e {
+	case ErrorTypeTokenRefreshFailed:
+		return -20
+	case ErrorTypeHealthCheckFailed:
+		return -15
+	case ErrorTypeRateLimited:
+		return -10
+	case ErrorTypeOverloaded:
+		return -30
+	case ErrorTypeServerError:
+		return -5
+	case ErrorTypeTimeout:
+		return -5
+	default:
+		return 0
+	}
+}
+
+// CircuitState represents the current circuit breaker state
+type CircuitState struct {
+	IsCircuitBroken  bool
+	CircuitBrokenAt  *time.Time
+	IsHalfOpen       bool
+	SuccessCount     int
+	BackoffRetryTime time.Time // 下次允许试探的时间
+}
+
+// CircuitBreakerUsecase implements circuit breaker business logic
+type CircuitBreakerUsecase struct {
+	repo    CircuitBreakerRepo
+	audit   AuditLogger
+	webhook WebhookService
+	logger  *log.Helper
+}
+
+// CircuitBreakerRepo defines the data layer interface for circuit breaker
+type CircuitBreakerRepo interface {
+	// UpdateHealthScore updates account health score using optimistic locking
+	UpdateHealthScore(ctx context.Context, accountID int64, newScore int) error
+
+	// SetCircuitBroken marks account as circuit broken
+	SetCircuitBroken(ctx context.Context, accountID int64, brokenAt time.Time) error
+
+	// GetCircuitState retrieves current circuit breaker state from Redis and DB
+	GetCircuitState(ctx context.Context, accountID int64) (*CircuitState, error)
+
+	// SetHalfOpen sets half-open state marker in Redis (SETNX for atomic operation)
+	// Returns true if successfully set (no other request is probing)
+	SetHalfOpen(ctx context.Context, accountID int64, ttl time.Duration) (bool, error)
+
+	// IncrementSuccessCount increments probe success counter and returns new count
+	IncrementSuccessCount(ctx context.Context, accountID int64) (int, error)
+
+	// GetSuccessCount gets current probe success count
+	GetSuccessCount(ctx context.Context, accountID int64) (int, error)
+
+	// ResetCircuitBreaker resets circuit breaker state (marks as healthy)
+	ResetCircuitBreaker(ctx context.Context, accountID int64) error
+
+	// SetBackoffTime sets next retry time for exponential backoff
+	SetBackoffTime(ctx context.Context, accountID int64, nextRetry time.Time) error
+
+	// GetBackoffTime gets next retry time
+	GetBackoffTime(ctx context.Context, accountID int64) (*time.Time, error)
+
+	// GetAccount retrieves account info (health_score, is_circuit_broken, etc.)
+	GetAccount(ctx context.Context, accountID int64) (*data.Account, error)
+}
+
+// NewCircuitBreakerUsecase creates a new circuit breaker usecase
+func NewCircuitBreakerUsecase(repo CircuitBreakerRepo, audit AuditLogger, webhook WebhookService, logger log.Logger) *CircuitBreakerUsecase {
+	return &CircuitBreakerUsecase{
+		repo:    repo,
+		audit:   audit,
+		webhook: webhook,
+		logger:  log.NewHelper(logger),
+	}
+}
+
+// UpdateHealthScore updates health score based on error type
+// Implements AC#1: 自动调整健康分数
+func (uc *CircuitBreakerUsecase) UpdateHealthScore(ctx context.Context, accountID int64, errorType ErrorType) error {
+	// Get current account state
+	account, err := uc.repo.GetAccount(ctx, accountID)
+	if err != nil {
+		return fmt.Errorf("failed to get account: %w", err)
+	}
+
+	oldScore := account.HealthScore
+	delta := errorType.Delta()
+	newScore := oldScore + delta
+
+	// Clamp score to [0, 100]
+	if newScore < 0 {
+		newScore = 0
+	}
+	if newScore > 100 {
+		newScore = 100
+	}
+
+	// Update using optimistic locking (with retry)
+	if err := uc.repo.UpdateHealthScore(ctx, accountID, newScore); err != nil {
+		return fmt.Errorf("failed to update health score: %w", err)
+	}
+
+	uc.logger.Infow("health score updated",
+		"account_id", accountID,
+		"error_type", errorType.String(),
+		"old_score", oldScore,
+		"delta", delta,
+		"new_score", newScore)
+
+	// Record audit log (async)
+	uc.audit.LogHealthScoreChange(ctx, accountID, oldScore, newScore, errorType.String())
+
+	// Check if circuit breaker should be triggered
+	if newScore < 30 && !account.IsCircuitBroken {
+		if err := uc.triggerCircuitBreaker(ctx, accountID, newScore); err != nil {
+			uc.logger.Errorw("failed to trigger circuit breaker", "account_id", accountID, "error", err)
+		}
+	}
+
+	return nil
+}
+
+// IncrementHealthScore increments health score by 1 on successful request
+// Implements AC#2: 每次成功请求 +1 分
+func (uc *CircuitBreakerUsecase) IncrementHealthScore(ctx context.Context, accountID int64) error {
+	account, err := uc.repo.GetAccount(ctx, accountID)
+	if err != nil {
+		return fmt.Errorf("failed to get account: %w", err)
+	}
+
+	oldScore := account.HealthScore
+	newScore := oldScore + 1
+	if newScore > 100 {
+		newScore = 100
+	}
+
+	// Skip update if already at max
+	if oldScore == 100 {
+		return nil
+	}
+
+	if err := uc.repo.UpdateHealthScore(ctx, accountID, newScore); err != nil {
+		return fmt.Errorf("failed to increment health score: %w", err)
+	}
+
+	uc.logger.Debugw("health score incremented",
+		"account_id", accountID,
+		"old_score", oldScore,
+		"new_score", newScore)
+
+	// Don't log every +1 increment to avoid log spam
+	// Only log when crossing significant thresholds
+	if oldScore < 100 && newScore == 100 {
+		uc.audit.LogHealthScoreChange(ctx, accountID, oldScore, newScore, "SuccessRequest")
+	}
+
+	return nil
+}
+
+// ResetHealthScore resets health score to 100 (e.g., after successful token refresh)
+// Implements AC#2: Token 刷新成功立即恢复至 100 分
+func (uc *CircuitBreakerUsecase) ResetHealthScore(ctx context.Context, accountID int64) error {
+	account, err := uc.repo.GetAccount(ctx, accountID)
+	if err != nil {
+		return fmt.Errorf("failed to get account: %w", err)
+	}
+
+	oldScore := account.HealthScore
+
+	// Skip if already at 100
+	if oldScore == 100 && !account.IsCircuitBroken {
+		return nil
+	}
+
+	// Update to 100
+	if err := uc.repo.UpdateHealthScore(ctx, accountID, 100); err != nil {
+		return fmt.Errorf("failed to reset health score: %w", err)
+	}
+
+	uc.logger.Infow("health score reset to 100",
+		"account_id", accountID,
+		"old_score", oldScore)
+
+	// Record audit log
+	uc.audit.LogHealthScoreChange(ctx, accountID, oldScore, 100, "TokenRefreshSuccess")
+
+	// If circuit was broken, reset it
+	if account.IsCircuitBroken {
+		if err := uc.repo.ResetCircuitBreaker(ctx, accountID); err != nil {
+			uc.logger.Errorw("failed to reset circuit breaker", "account_id", accountID, "error", err)
+		} else {
+			uc.audit.LogCircuitRecovered(ctx, accountID, time.Since(*account.CircuitBrokenAt), 0)
+		}
+	}
+
+	return nil
+}
+
+// CheckCircuitBreaker checks if account should be circuit broken
+// Implements AC#3: health_score < 30 触发熔断
+func (uc *CircuitBreakerUsecase) CheckCircuitBreaker(ctx context.Context, accountID int64) error {
+	account, err := uc.repo.GetAccount(ctx, accountID)
+	if err != nil {
+		return fmt.Errorf("failed to get account: %w", err)
+	}
+
+	if account.HealthScore < 30 && !account.IsCircuitBroken {
+		return uc.triggerCircuitBreaker(ctx, accountID, account.HealthScore)
+	}
+
+	return nil
+}
+
+// triggerCircuitBreaker marks account as circuit broken
+func (uc *CircuitBreakerUsecase) triggerCircuitBreaker(ctx context.Context, accountID int64, healthScore int) error {
+	now := time.Now()
+
+	// Mark as circuit broken in DB
+	if err := uc.repo.SetCircuitBroken(ctx, accountID, now); err != nil {
+		return fmt.Errorf("failed to set circuit broken: %w", err)
+	}
+
+	uc.logger.Warnw("circuit breaker triggered",
+		"account_id", accountID,
+		"health_score", healthScore,
+		"broken_at", now)
+
+	// Record audit log
+	uc.audit.LogCircuitBroken(ctx, accountID, healthScore, now)
+
+	// Send webhook notification (async, non-blocking)
+	go func() {
+		account, err := uc.repo.GetAccount(context.Background(), accountID)
+		if err != nil {
+			uc.logger.Errorw("failed to get account for webhook", "account_id", accountID, "error", err)
+			return
+		}
+
+		event := &CircuitBrokenEvent{
+			AccountID:       accountID,
+			AccountName:     account.Name,
+			HealthScore:     healthScore,
+			CircuitBrokenAt: now,
+		}
+
+		if err := uc.webhook.NotifyCircuitBroken(context.Background(), event); err != nil {
+			uc.logger.Errorw("failed to send webhook notification", "account_id", accountID, "error", err)
+		}
+	}()
+
+	return nil
+}
+
+// IsHalfOpen checks if circuit breaker is in half-open state
+// Implements AC#4: 熔断后 5 分钟,允许 1 个试探性请求
+func (uc *CircuitBreakerUsecase) IsHalfOpen(ctx context.Context, accountID int64) (bool, error) {
+	state, err := uc.repo.GetCircuitState(ctx, accountID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get circuit state: %w", err)
+	}
+
+	// Not circuit broken -> not half-open
+	if !state.IsCircuitBroken || state.CircuitBrokenAt == nil {
+		return false, nil
+	}
+
+	// Check if backoff time has been reached
+	backoffTime, err := uc.repo.GetBackoffTime(ctx, accountID)
+	if err != nil {
+		// If no backoff time set, default to 5 minutes from circuit broken time
+		backoffTime = &time.Time{}
+		*backoffTime = state.CircuitBrokenAt.Add(5 * time.Minute)
+	}
+
+	// Not enough time has passed
+	if time.Now().Before(*backoffTime) {
+		return false, nil
+	}
+
+	// Try to set half-open marker (atomic SETNX)
+	success, err := uc.repo.SetHalfOpen(ctx, accountID, 1*time.Minute)
+	if err != nil {
+		uc.logger.Warnw("failed to set half-open marker (degraded mode: allow probe)",
+			"account_id", accountID,
+			"error", err)
+		// Degradation: allow probe on Redis failure
+		return true, nil
+	}
+
+	if success {
+		uc.logger.Infow("circuit breaker entered half-open state",
+			"account_id", accountID,
+			"backoff_time", backoffTime)
+	}
+
+	return success, nil
+}
+
+// RecordProbeSuccess records a successful probe request
+// Implements AC#4: 试探请求成功 → 健康分数 +20,连续成功 3 次后解除熔断
+func (uc *CircuitBreakerUsecase) RecordProbeSuccess(ctx context.Context, accountID int64) error {
+	// Increment health score by 20
+	account, err := uc.repo.GetAccount(ctx, accountID)
+	if err != nil {
+		return fmt.Errorf("failed to get account: %w", err)
+	}
+
+	oldScore := account.HealthScore
+	newScore := oldScore + 20
+	if newScore > 100 {
+		newScore = 100
+	}
+
+	if err := uc.repo.UpdateHealthScore(ctx, accountID, newScore); err != nil {
+		return fmt.Errorf("failed to update health score after probe success: %w", err)
+	}
+
+	// Increment success count
+	successCount, err := uc.repo.IncrementSuccessCount(ctx, accountID)
+	if err != nil {
+		uc.logger.Warnw("failed to increment success count (degraded mode)",
+			"account_id", accountID,
+			"error", err)
+		successCount = 0 // Degrade gracefully
+	}
+
+	uc.logger.Infow("probe request succeeded",
+		"account_id", accountID,
+		"old_score", oldScore,
+		"new_score", newScore,
+		"success_count", successCount)
+
+	// Record audit log
+	uc.audit.LogHealthScoreChange(ctx, accountID, oldScore, newScore, "ProbeSuccess")
+
+	// Reset circuit breaker after 3 consecutive successes
+	if successCount >= 3 {
+		if err := uc.resetCircuitBreakerAfterProbe(ctx, accountID, successCount); err != nil {
+			return fmt.Errorf("failed to reset circuit breaker: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// RecordProbeFailure records a failed probe request
+// Implements AC#4: 试探请求失败 → 延长熔断时间(指数退避: 5m → 10m → 30m)
+func (uc *CircuitBreakerUsecase) RecordProbeFailure(ctx context.Context, accountID int64) error {
+	// Get current backoff level
+	state, err := uc.repo.GetCircuitState(ctx, accountID)
+	if err != nil {
+		return fmt.Errorf("failed to get circuit state: %w", err)
+	}
+
+	// Reset success count to 0
+	// (We don't have a reset method, but IncrementSuccessCount will be called from 0 next time)
+
+	// Calculate next backoff duration (exponential backoff)
+	var nextBackoff time.Duration
+	backoffTime, err := uc.repo.GetBackoffTime(ctx, accountID)
+	if err != nil || backoffTime == nil {
+		// First failure -> 10 minutes (extend from initial 5m)
+		nextBackoff = 10 * time.Minute
+	} else {
+		// Calculate based on how many times we've backed off
+		timeSinceBreak := time.Since(*state.CircuitBrokenAt)
+		if timeSinceBreak < 15*time.Minute {
+			// Second failure -> 30 minutes
+			nextBackoff = 30 * time.Minute
+		} else {
+			// Third+ failure -> cap at 30 minutes
+			nextBackoff = 30 * time.Minute
+		}
+	}
+
+	nextRetry := time.Now().Add(nextBackoff)
+
+	// Set new backoff time
+	if err := uc.repo.SetBackoffTime(ctx, accountID, nextRetry); err != nil {
+		uc.logger.Errorw("failed to set backoff time", "account_id", accountID, "error", err)
+	}
+
+	uc.logger.Warnw("probe request failed, extending backoff",
+		"account_id", accountID,
+		"next_backoff", nextBackoff,
+		"next_retry", nextRetry)
+
+	return nil
+}
+
+// resetCircuitBreakerAfterProbe resets circuit breaker after successful probes
+func (uc *CircuitBreakerUsecase) resetCircuitBreakerAfterProbe(ctx context.Context, accountID int64, probeCount int) error {
+	account, err := uc.repo.GetAccount(ctx, accountID)
+	if err != nil {
+		return err
+	}
+
+	if err := uc.repo.ResetCircuitBreaker(ctx, accountID); err != nil {
+		return err
+	}
+
+	recoverTime := time.Duration(0)
+	if account.CircuitBrokenAt != nil {
+		recoverTime = time.Since(*account.CircuitBrokenAt)
+	}
+
+	uc.logger.Infow("circuit breaker recovered after successful probes",
+		"account_id", accountID,
+		"probe_count", probeCount,
+		"recover_time", recoverTime)
+
+	// Record audit log
+	uc.audit.LogCircuitRecovered(ctx, accountID, recoverTime, probeCount)
+
+	// Send webhook notification (async)
+	go func() {
+		event := &CircuitRecoveredEvent{
+			AccountID:   accountID,
+			AccountName: account.Name,
+			ProbeCount:  probeCount,
+			RecoverTime: recoverTime,
+		}
+
+		if err := uc.webhook.NotifyCircuitRecovered(context.Background(), event); err != nil {
+			uc.logger.Errorw("failed to send webhook notification", "account_id", accountID, "error", err)
+		}
+	}()
+
+	return nil
+}
+
+// RecordAPIError records API error and updates health score
+// Implements AC#1 and handles distinction with Story 2.4 local rate limiting
+func (uc *CircuitBreakerUsecase) RecordAPIError(ctx context.Context, accountID int64, statusCode int, isLocalRateLimit bool) error {
+	if isLocalRateLimit {
+		// Story 2.4 本地限流,不扣健康分数
+		uc.logger.Debugw("local rate limit triggered, health score unchanged",
+			"account_id", accountID,
+			"reason", "protected by Story 2.4 rate limiter")
+		return nil
+	}
+
+	// Map status code to error type
+	var errorType ErrorType
+	switch statusCode {
+	case 429:
+		errorType = ErrorTypeRateLimited
+	case 529:
+		errorType = ErrorTypeOverloaded
+	case 500, 502, 503, 504:
+		errorType = ErrorTypeServerError
+	case 0: // Timeout
+		errorType = ErrorTypeTimeout
+	default:
+		// Unknown error, treat as server error
+		errorType = ErrorTypeServerError
+	}
+
+	return uc.UpdateHealthScore(ctx, accountID, errorType)
+}
+
+// RecordAPISuccess records successful API call
+func (uc *CircuitBreakerUsecase) RecordAPISuccess(ctx context.Context, accountID int64) error {
+	return uc.IncrementHealthScore(ctx, accountID)
+}

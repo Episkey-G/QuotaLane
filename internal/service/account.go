@@ -12,6 +12,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // AccountService implements the AccountService gRPC interface.
@@ -320,4 +321,139 @@ func (s *AccountService) ResetHealthScore(ctx context.Context, req *v1.ResetHeal
 	return &v1.ResetHealthScoreResponse{
 		Account: account,
 	}, nil
+}
+
+// ========== Story 2.6: 账户组管理 RPC 实现 ==========
+
+// CreateAccountGroup creates a new account group (admin operation).
+func (s *AccountService) CreateAccountGroup(ctx context.Context, req *v1.CreateAccountGroupRequest) (*v1.CreateAccountGroupResponse, error) {
+	s.logger.Infow("CreateAccountGroup called", "name", req.Name, "priority", req.Priority, "accounts", len(req.AccountIds))
+
+	// TODO: Add admin permission check
+
+	group, err := s.uc.GetAccountGroupUseCase().CreateAccountGroup(ctx, req.Name, req.Description, req.Priority, req.AccountIds)
+	if err != nil {
+		s.logger.Errorw("failed to create account group", "name", req.Name, "error", err)
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to create account group: %v", err))
+	}
+
+	return &v1.CreateAccountGroupResponse{
+		Group: convertAccountGroupToProto(group),
+	}, nil
+}
+
+// ListAccountGroups retrieves a paginated list of account groups.
+func (s *AccountService) ListAccountGroups(ctx context.Context, req *v1.ListAccountGroupsRequest) (*v1.ListAccountGroupsResponse, error) {
+	s.logger.Debugw("ListAccountGroups called", "page", req.Page, "page_size", req.PageSize)
+
+	groups, total, err := s.uc.GetAccountGroupUseCase().ListAccountGroups(ctx, req.Page, req.PageSize)
+	if err != nil {
+		s.logger.Errorw("failed to list account groups", "error", err)
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to list account groups: %v", err))
+	}
+
+	protoGroups := make([]*v1.AccountGroup, len(groups))
+	for i, g := range groups {
+		protoGroups[i] = convertAccountGroupToProto(g)
+	}
+
+	return &v1.ListAccountGroupsResponse{
+		Groups:   protoGroups,
+		Total:    total,
+		Page:     req.Page,
+		PageSize: req.PageSize,
+	}, nil
+}
+
+// GetAccountGroup retrieves an account group by ID with full details.
+func (s *AccountService) GetAccountGroup(ctx context.Context, req *v1.GetAccountGroupRequest) (*v1.GetAccountGroupResponse, error) {
+	s.logger.Debugw("GetAccountGroup called", "id", req.Id)
+
+	group, err := s.uc.GetAccountGroupUseCase().GetAccountGroup(ctx, req.Id)
+	if err != nil {
+		s.logger.Errorw("failed to get account group", "id", req.Id, "error", err)
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to get account group: %v", err))
+	}
+
+	// Get accounts in the group
+	accounts, err := s.uc.GetAccountGroupUseCase().GetAccountsByGroup(ctx, req.Id)
+	if err != nil {
+		s.logger.Errorw("failed to get group accounts", "group_id", req.Id, "error", err)
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to get group accounts: %v", err))
+	}
+
+	// Convert accounts to Proto (simplified version)
+	protoAccounts := make([]*v1.Account, len(accounts))
+	for i, acc := range accounts {
+		protoAccounts[i] = &v1.Account{
+			Id:          acc.ID,
+			Name:        acc.Name,
+			HealthScore: int32(acc.HealthScore),
+			// Add other fields as needed
+		}
+	}
+
+	return &v1.GetAccountGroupResponse{
+		Group:    convertAccountGroupToProto(group),
+		Accounts: protoAccounts,
+	}, nil
+}
+
+// UpdateAccountGroup updates an existing account group (admin operation).
+func (s *AccountService) UpdateAccountGroup(ctx context.Context, req *v1.UpdateAccountGroupRequest) (*v1.UpdateAccountGroupResponse, error) {
+	s.logger.Infow("UpdateAccountGroup called", "id", req.Id)
+
+	// TODO: Add admin permission check
+
+	name := req.GetName()
+	description := req.GetDescription()
+	priority := req.GetPriority()
+
+	err := s.uc.GetAccountGroupUseCase().UpdateAccountGroup(ctx, req.Id, name, description, priority, req.AccountIds)
+	if err != nil {
+		s.logger.Errorw("failed to update account group", "id", req.Id, "error", err)
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to update account group: %v", err))
+	}
+
+	// Get updated group
+	group, err := s.uc.GetAccountGroupUseCase().GetAccountGroup(ctx, req.Id)
+	if err != nil {
+		s.logger.Errorw("failed to get updated group", "id", req.Id, "error", err)
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to get updated group: %v", err))
+	}
+
+	return &v1.UpdateAccountGroupResponse{
+		Group: convertAccountGroupToProto(group),
+	}, nil
+}
+
+// DeleteAccountGroup soft deletes an account group (admin operation).
+func (s *AccountService) DeleteAccountGroup(ctx context.Context, req *v1.DeleteAccountGroupRequest) (*v1.DeleteAccountGroupResponse, error) {
+	s.logger.Infow("DeleteAccountGroup called", "id", req.Id)
+
+	// TODO: Add admin permission check
+
+	err := s.uc.GetAccountGroupUseCase().DeleteAccountGroup(ctx, req.Id)
+	if err != nil {
+		s.logger.Errorw("failed to delete account group", "id", req.Id, "error", err)
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to delete account group: %v", err))
+	}
+
+	return &v1.DeleteAccountGroupResponse{
+		Success: true,
+		Message: "账户组删除成功",
+	}, nil
+}
+
+// convertAccountGroupToProto converts biz.AccountGroup to Proto message.
+func convertAccountGroupToProto(group *biz.AccountGroup) *v1.AccountGroup {
+	return &v1.AccountGroup{
+		Id:          group.ID,
+		Name:        group.Name,
+		Description: group.Description,
+		Priority:    group.Priority,
+		AccountIds:  group.AccountIDs,
+		CreatedAt:   timestamppb.New(group.CreatedAt),
+		UpdatedAt:   timestamppb.New(group.UpdatedAt),
+	}
 }
