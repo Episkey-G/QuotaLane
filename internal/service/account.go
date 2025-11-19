@@ -472,3 +472,39 @@ func convertAccountGroupToProto(group *biz.AccountGroup) *v1.AccountGroup {
 		UpdatedAt:   timestamppb.New(group.UpdatedAt),
 	}
 }
+
+// ========== Story 2.7: 账户元数据和标签查询 RPC 实现 ==========
+
+// ListAccountsByTags retrieves accounts matching ALL specified tags (AND logic).
+func (s *AccountService) ListAccountsByTags(ctx context.Context, req *v1.ListAccountsByTagsRequest) (*v1.ListAccountsByTagsResponse, error) {
+	s.logger.Debugw("ListAccountsByTags called", "tags", req.Tags, "limit", req.Limit, "offset", req.Offset)
+
+	// Set default limit if not provided
+	limit := req.Limit
+	if limit == 0 {
+		limit = 20 // Default limit
+	}
+
+	offset := req.Offset
+	if offset < 0 {
+		offset = 0 // Ensure non-negative offset
+	}
+
+	// Call business logic to query accounts by tags
+	accounts, err := s.uc.GetAccountsByTags(ctx, req.Tags, int(limit), int(offset))
+	if err != nil {
+		s.logger.Errorw("failed to list accounts by tags", "tags", req.Tags, "error", err)
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to list accounts by tags: %v", err))
+	}
+
+	s.logger.Infow("accounts retrieved by tags",
+		"tags", req.Tags,
+		"count", len(accounts),
+		"limit", limit,
+		"offset", offset)
+
+	return &v1.ListAccountsByTagsResponse{
+		Accounts: accounts,
+		Total:    int32(len(accounts)), // Note: This is the count of returned accounts, not total matching records
+	}, nil
+}

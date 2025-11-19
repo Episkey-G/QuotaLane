@@ -648,3 +648,7 @@ func TestStatusToProto_AllCases(t *testing.T) {
 	require.Equal(t, v1.AccountStatus_ACCOUNT_INACTIVE, StatusToProto(StatusInactive))
 	require.Equal(t, v1.AccountStatus_ACCOUNT_ERROR, StatusToProto(StatusError))
 }
+
+// Note: Integration tests for ListAccountsByTags and UpdateAccount cache clearing
+// are covered by biz layer tests with mocked repositories (see account_test.go in biz layer).
+// These provide better test isolation and are less fragile than database mock tests.

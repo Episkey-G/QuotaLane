@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"QuotaLane/internal/data"
+	pkgoauth "QuotaLane/pkg/oauth"
 
 	"github.com/go-kratos/kratos/v2/errors"
 )
@@ -71,25 +72,33 @@ func (uc *AccountUsecase) RefreshClaudeToken(ctx context.Context, accountID int6
 		return fmt.Errorf("failed to parse OAuth data")
 	}
 
-	// 3. 提取 refresh_token 和代理配置
+	// 3. 提取 refresh_token
 	refreshToken := oauthData.RefreshToken
 	if refreshToken == "" {
 		return fmt.Errorf("account %d has no refresh_token", accountID)
 	}
 
-	// 从 metadata 读取 proxy_url（可选）
-	var proxyURL string
+	// 4. 解析 metadata 并转换为 OAuth metadata 格式
+	var oauthMeta *pkgoauth.AccountMetadata
 	if account.Metadata != nil && *account.Metadata != "" {
-		var metadata map[string]interface{}
-		if err := json.Unmarshal([]byte(*account.Metadata), &metadata); err == nil {
-			if proxy, ok := metadata["proxy_url"].(string); ok {
-				proxyURL = proxy
+		// 使用 metadata 包解析
+		meta, err := data.ParseMetadata(account.Metadata)
+		if err != nil {
+			uc.logger.Warnf("failed to parse account metadata for account %d: %v", accountID, err)
+		} else if !meta.IsEmpty() {
+			// 转换为 OAuth metadata 格式
+			oauthMeta = &pkgoauth.AccountMetadata{
+				ProxyURL: meta.ProxyURL,
+			}
+			// 如果代理未启用，清空 proxy_url
+			if !meta.ProxyEnabled {
+				oauthMeta.ProxyURL = ""
 			}
 		}
 	}
 
-	// 4. 调用 OAuth 服务刷新 Token
-	tokenResp, err := uc.oauth.RefreshToken(ctx, refreshToken, proxyURL)
+	// 5. 调用统一 OAuth Manager 刷新 Token
+	tokenResp, err := uc.oauthManager.RefreshToken(ctx, account.Provider, refreshToken, oauthMeta)
 	if err != nil {
 		uc.logger.Errorf("OAuth refresh failed for account %d: %v", accountID, err)
 
@@ -101,7 +110,7 @@ func (uc *AccountUsecase) RefreshClaudeToken(ctx context.Context, accountID int6
 		return fmt.Errorf("OAuth refresh failed: %w", err)
 	}
 
-	// 5. 构建新的 OAuth 数据
+	// 6. 构建新的 OAuth 数据
 	newExpiresAt := time.Now().UTC().Add(time.Duration(tokenResp.ExpiresIn) * time.Second)
 	newOAuthData := OAuthData{
 		AccessToken:  tokenResp.AccessToken,
@@ -109,7 +118,7 @@ func (uc *AccountUsecase) RefreshClaudeToken(ctx context.Context, accountID int6
 		ExpiresAt:    newExpiresAt,
 	}
 
-	// 6. 加密新的 OAuth 数据
+	// 7. 加密新的 OAuth 数据
 	newJSON, err := json.Marshal(newOAuthData)
 	if err != nil {
 		return fmt.Errorf("failed to marshal OAuth data: %w", err)
@@ -121,12 +130,12 @@ func (uc *AccountUsecase) RefreshClaudeToken(ctx context.Context, accountID int6
 		return fmt.Errorf("failed to encrypt OAuth data")
 	}
 
-	// 7. 更新数据库
+	// 8. 更新数据库
 	if err := uc.repo.UpdateOAuthData(ctx, accountID, encrypted, newExpiresAt); err != nil {
 		return fmt.Errorf("failed to update OAuth data: %w", err)
 	}
 
-	// 8. 刷新成功，重置健康分数并清除失败计数器
+	// 9. 刷新成功，重置健康分数并清除失败计数器
 	if err := uc.repo.UpdateHealthScore(ctx, accountID, 100); err != nil {
 		uc.logger.Warnf("failed to reset health score for account %d: %v", accountID, err)
 	}

@@ -156,8 +156,8 @@ func TestGetGroup(t *testing.T) {
 		rows := sqlmock.NewRows([]string{"id", "name", "description", "priority", "created_at", "updated_at", "deleted_at"}).
 			AddRow(groupID, "production", "Production accounts", int32(200), now, now, nil)
 
-		// GORM's First() adds LIMIT 1, so we need to expect 2 arguments: id and limit
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `account_groups` WHERE id = ? AND deleted_at IS NULL")).
+		// GORM's First() adds ORDER BY and LIMIT as parameters
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `account_groups` WHERE id = ? AND deleted_at IS NULL ORDER BY `account_groups`.`id` LIMIT ?")).
 			WithArgs(groupID, 1).
 			WillReturnRows(rows)
 
@@ -186,8 +186,8 @@ func TestGetGroup(t *testing.T) {
 	t.Run("get group not found", func(t *testing.T) {
 		mr.FlushAll()
 
-		// GORM's First() adds LIMIT 1, so we need to expect 2 arguments: id and limit
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `account_groups` WHERE id = ? AND deleted_at IS NULL")).
+		// GORM's First() adds ORDER BY and LIMIT as parameters
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `account_groups` WHERE id = ? AND deleted_at IS NULL ORDER BY `account_groups`.`id` LIMIT ?")).
 			WithArgs(int64(999), 1).
 			WillReturnError(gorm.ErrRecordNotFound)
 

@@ -10,8 +10,8 @@ import (
 	"time"
 
 	v1 "QuotaLane/api/v1"
-
 	pkgerrors "QuotaLane/pkg/errors"
+	"QuotaLane/pkg/metadata"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -652,5 +652,62 @@ func (r *AccountRepo) ListCodexCLIAccountsNeedingRefresh(ctx context.Context) ([
 	}
 
 	r.logger.Infow("Codex CLI accounts needing refresh", "count", len(accounts), "threshold", threshold)
+	return accounts, nil
+}
+
+// ParseMetadata parses metadata JSON string into AccountMetadata struct.
+// Returns nil if metadata is nil or empty (no error).
+// Story: 2-7 Account Metadata and Extended Configuration
+func ParseMetadata(metadataPtr *string) (*metadata.AccountMetadata, error) {
+	if metadataPtr == nil || *metadataPtr == "" {
+		return &metadata.AccountMetadata{}, nil
+	}
+
+	return metadata.Parse(*metadataPtr)
+}
+
+// ListAccountsByTags queries accounts that match ALL specified tags (AND logic).
+// Uses JSON_CONTAINS to filter accounts by tags in metadata JSON.
+// Returns accounts ordered by health_score DESC, id ASC.
+// Story: 2-7 Account Metadata and Extended Configuration
+func (r *AccountRepo) ListAccountsByTags(ctx context.Context, tags []string, limit, offset int) ([]*Account, error) {
+	if len(tags) == 0 {
+		// No tags specified, return empty list (not all accounts)
+		// Caller should use ListAccounts instead for unfiltered queries
+		return []*Account{}, nil
+	}
+
+	var accounts []*Account
+
+	// Build query: start with base WHERE clause
+	query := r.db.WithContext(ctx).Where("status = ?", StatusActive)
+
+	// Add JSON_CONTAINS condition for each tag (AND logic)
+	// SQL: WHERE JSON_CONTAINS(metadata->'$.tags', '["tag1"]')
+	//      AND JSON_CONTAINS(metadata->'$.tags', '["tag2"]')
+	for _, tag := range tags {
+		// JSON array format: ["tag"]
+		tagJSON := fmt.Sprintf(`["%s"]`, tag)
+		query = query.Where("JSON_CONTAINS(metadata->'$.tags', ?)", tagJSON)
+	}
+
+	// Apply pagination and ordering
+	err := query.
+		Order("health_score DESC, id ASC").
+		Limit(limit).
+		Offset(offset).
+		Find(&accounts).Error
+
+	if err != nil {
+		r.logger.Errorf("failed to list accounts by tags: %v", err)
+		return nil, fmt.Errorf("failed to list accounts by tags: %w", err)
+	}
+
+	r.logger.Infow("accounts listed by tags",
+		"tags", tags,
+		"count", len(accounts),
+		"limit", limit,
+		"offset", offset)
+
 	return accounts, nil
 }
