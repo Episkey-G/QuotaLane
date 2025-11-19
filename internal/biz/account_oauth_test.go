@@ -81,6 +81,10 @@ func (m *mockAccountRepo) UpdateAccountStatus(ctx context.Context, accountID int
 	return nil
 }
 
+func (m *mockAccountRepo) ListAccountsByTags(ctx context.Context, tags []string, limit, offset int) ([]*data.Account, error) {
+	return nil, nil
+}
+
 // mockOAuthProvider implements oauth.OAuthProvider for testing
 type mockOAuthProvider struct {
 	authURL      string

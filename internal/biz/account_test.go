@@ -102,6 +102,14 @@ func (m *MockAccountRepo) ListExpiringOAuthAccounts(ctx context.Context, thresho
 	return args.Get(0).([]*data.Account), args.Error(1)
 }
 
+func (m *MockAccountRepo) ListAccountsByTags(ctx context.Context, tags []string, limit, offset int) ([]*data.Account, error) {
+	args := m.Called(ctx, tags, limit, offset)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*data.Account), args.Error(1)
+}
+
 // setupTestUsecase creates a test AccountUsecase with mock dependencies.
 func setupTestUsecase(t *testing.T) (*AccountUsecase, *MockAccountRepo, *crypto.AESCrypto) {
 	mockRepo := new(MockAccountRepo)
@@ -537,4 +545,163 @@ func TestMaskSensitiveFields(t *testing.T) {
 			assert.Equal(t, tt.expectedOAuth, account.OAuthDataEncrypted)
 		})
 	}
+}
+
+// TestGetAccountsByTags tests filtering accounts by tags at the business logic layer
+func TestGetAccountsByTags(t *testing.T) {
+	uc, mockRepo, _ := setupTestUsecase(t)
+	ctx := context.Background()
+
+	t.Run("successful tag filtering", func(t *testing.T) {
+		metadata1 := `{"tags":["production","us-east"],"proxy_url":"socks5://localhost:1080"}`
+		metadata2 := `{"tags":["production","eu-west"]}`
+
+		expectedAccounts := []*data.Account{
+			{
+				ID:       1,
+				Name:     "Account1",
+				Provider: data.ProviderClaudeConsole,
+				Status:   data.StatusActive,
+				Metadata: &metadata1,
+			},
+			{
+				ID:       2,
+				Name:     "Account2",
+				Provider: data.ProviderClaudeConsole,
+				Status:   data.StatusActive,
+				Metadata: &metadata2,
+			},
+		}
+
+		mockRepo.On("ListAccountsByTags", ctx, []string{"production"}, 100, 0).
+			Return(expectedAccounts, nil)
+
+		accounts, err := uc.GetAccountsByTags(ctx, []string{"production"}, 100, 0)
+		assert.NoError(t, err)
+		assert.Len(t, accounts, 2)
+		assert.Equal(t, "Account1", accounts[0].Name)
+		assert.Equal(t, "Account2", accounts[1].Name)
+
+		// Verify metadata is returned
+		assert.NotEmpty(t, accounts[0].Metadata)
+		assert.Contains(t, accounts[0].Metadata, "production")
+
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("multiple tags AND logic", func(t *testing.T) {
+		metadata := `{"tags":["production","critical"]}`
+		expectedAccounts := []*data.Account{
+			{
+				ID:       1,
+				Name:     "CriticalAccount",
+				Provider: data.ProviderClaudeConsole,
+				Status:   data.StatusActive,
+				Metadata: &metadata,
+			},
+		}
+
+		mockRepo.On("ListAccountsByTags", ctx, []string{"production", "critical"}, 100, 0).
+			Return(expectedAccounts, nil)
+
+		accounts, err := uc.GetAccountsByTags(ctx, []string{"production", "critical"}, 100, 0)
+		assert.NoError(t, err)
+		assert.Len(t, accounts, 1)
+		assert.Equal(t, "CriticalAccount", accounts[0].Name)
+
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("no matching tags returns empty", func(t *testing.T) {
+		mockRepo.On("ListAccountsByTags", ctx, []string{"nonexistent"}, 100, 0).
+			Return([]*data.Account{}, nil)
+
+		accounts, err := uc.GetAccountsByTags(ctx, []string{"nonexistent"}, 100, 0)
+		assert.NoError(t, err)
+		assert.Len(t, accounts, 0)
+
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("validates limit parameter", func(t *testing.T) {
+		_, err := uc.GetAccountsByTags(ctx, []string{"test"}, 0, 0)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid limit")
+
+		_, err = uc.GetAccountsByTags(ctx, []string{"test"}, 101, 0)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid limit")
+	})
+
+	t.Run("validates offset parameter", func(t *testing.T) {
+		_, err := uc.GetAccountsByTags(ctx, []string{"test"}, 10, -1)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid offset")
+	})
+
+	t.Run("handles repository error", func(t *testing.T) {
+		mockRepo.On("ListAccountsByTags", ctx, []string{"error"}, 10, 0).
+			Return(nil, errors.New("database error"))
+
+		_, err := uc.GetAccountsByTags(ctx, []string{"error"}, 10, 0)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to list accounts by tags")
+
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("masks sensitive data in response", func(t *testing.T) {
+		// Test that sensitive fields are masked even if present in metadata
+		metadata := `{"tags":["test"],"proxy_url":"socks5://user:password@localhost:1080"}`
+		apiKey := "sk-proj-verylongapikey12345"
+		oauthData := "encrypted_oauth_data"
+
+		expectedAccounts := []*data.Account{
+			{
+				ID:                 1,
+				Name:               "SecureAccount",
+				Provider:           data.ProviderClaudeConsole,
+				Status:             data.StatusActive,
+				Metadata:           &metadata,
+				APIKeyEncrypted:    apiKey,
+				OAuthDataEncrypted: oauthData,
+			},
+		}
+
+		mockRepo.On("ListAccountsByTags", ctx, []string{"test"}, 10, 0).
+			Return(expectedAccounts, nil)
+
+		accounts, err := uc.GetAccountsByTags(ctx, []string{"test"}, 10, 0)
+		assert.NoError(t, err)
+		assert.Len(t, accounts, 1)
+
+		// Verify sensitive fields are masked
+		assert.Equal(t, "sk-p****2345", accounts[0].ApiKeyEncrypted)
+		assert.Equal(t, "[ENCRYPTED]", accounts[0].OAuthDataEncrypted)
+
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("pagination with offset", func(t *testing.T) {
+		metadata := `{"tags":["staging"]}`
+		expectedAccounts := []*data.Account{
+			{
+				ID:       11,
+				Name:     "Account11",
+				Provider: data.ProviderClaudeConsole,
+				Status:   data.StatusActive,
+				Metadata: &metadata,
+			},
+		}
+
+		mockRepo.On("ListAccountsByTags", ctx, []string{"staging"}, 10, 10).
+			Return(expectedAccounts, nil)
+
+		accounts, err := uc.GetAccountsByTags(ctx, []string{"staging"}, 10, 10)
+		assert.NoError(t, err)
+		assert.Len(t, accounts, 1)
+		assert.Equal(t, int64(11), accounts[0].Id)
+
+		mockRepo.AssertExpectations(t)
+	})
 }

@@ -7,6 +7,7 @@ import (
 	v1 "QuotaLane/api/v1"
 	"QuotaLane/internal/data"
 	"QuotaLane/pkg/crypto"
+	"QuotaLane/pkg/metadata"
 	"QuotaLane/pkg/oauth"
 	pkgoauth "QuotaLane/pkg/oauth" // 统一 OAuth Manager
 	"QuotaLane/pkg/openai"
@@ -60,8 +61,13 @@ func (uc *AccountUsecase) CreateAccount(ctx context.Context, req *v1.CreateAccou
 	// Validate and prepare metadata
 	var metadataPtr *string
 	if req.Metadata != "" {
-		if err := data.ValidateMetadataJSON(req.Metadata); err != nil {
-			return nil, fmt.Errorf("invalid metadata: %w", err)
+		// Parse and validate metadata using structured validation
+		meta, err := metadata.Parse(req.Metadata)
+		if err != nil {
+			return nil, fmt.Errorf("invalid metadata JSON: %w", err)
+		}
+		if err := meta.Validate(); err != nil {
+			return nil, fmt.Errorf("metadata validation failed: %w", err)
 		}
 		metadataPtr = &req.Metadata
 	}
@@ -197,9 +203,13 @@ func (uc *AccountUsecase) UpdateAccount(ctx context.Context, req *v1.UpdateAccou
 		account.Status = data.StatusFromProto(*req.Status)
 	}
 	if req.Metadata != nil {
-		// Validate metadata JSON
-		if err := data.ValidateMetadataJSON(*req.Metadata); err != nil {
-			return nil, fmt.Errorf("invalid metadata: %w", err)
+		// Parse and validate metadata using structured validation
+		meta, err := metadata.Parse(*req.Metadata)
+		if err != nil {
+			return nil, fmt.Errorf("invalid metadata JSON: %w", err)
+		}
+		if err := meta.Validate(); err != nil {
+			return nil, fmt.Errorf("metadata validation failed: %w", err)
 		}
 		account.Metadata = req.Metadata
 	}
@@ -271,6 +281,15 @@ func (uc *AccountUsecase) maskSensitiveFields(account *v1.Account) {
 	if account.OAuthDataEncrypted != "" {
 		account.OAuthDataEncrypted = "[ENCRYPTED]"
 	}
+
+	// Mask sensitive fields in metadata (proxy_url password)
+	if account.Metadata != "" {
+		meta, err := metadata.Parse(account.Metadata)
+		if err == nil && !meta.IsEmpty() {
+			masked := meta.MaskSensitive()
+			account.Metadata = masked.String()
+		}
+	}
 }
 
 // ResetHealthScoreByAdmin resets account health score to 100 (admin operation).
@@ -290,4 +309,44 @@ func (uc *AccountUsecase) ResetHealthScoreByAdmin(ctx context.Context, accountID
 	uc.logger.Infow("health score reset by admin", "account_id", accountID)
 
 	return account, nil
+}
+
+// GetAccountsByTags retrieves accounts matching ALL specified tags (AND logic).
+// Story 2-7: Tag-based account filtering for grouping and organization.
+func (uc *AccountUsecase) GetAccountsByTags(ctx context.Context, tags []string, limit, offset int) ([]*v1.Account, error) {
+	// Validate input
+	if len(tags) == 0 {
+		return nil, fmt.Errorf("at least one tag must be provided")
+	}
+	if len(tags) > 10 {
+		return nil, fmt.Errorf("too many tags: max 10 allowed, got %d", len(tags))
+	}
+	if limit <= 0 || limit > 100 {
+		return nil, fmt.Errorf("invalid limit: must be between 1 and 100, got %d", limit)
+	}
+	if offset < 0 {
+		return nil, fmt.Errorf("invalid offset: must be non-negative, got %d", offset)
+	}
+
+	// Query accounts by tags (AND logic)
+	accounts, err := uc.repo.ListAccountsByTags(ctx, tags, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list accounts by tags: %w", err)
+	}
+
+	// Convert to proto accounts with masked sensitive data
+	protoAccounts := make([]*v1.Account, 0, len(accounts))
+	for _, account := range accounts {
+		proto := account.ToProto()
+		uc.maskSensitiveFields(proto)
+		protoAccounts = append(protoAccounts, proto)
+	}
+
+	uc.logger.Debugw("accounts retrieved by tags",
+		"tags", tags,
+		"count", len(protoAccounts),
+		"limit", limit,
+		"offset", offset)
+
+	return protoAccounts, nil
 }

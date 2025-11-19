@@ -143,6 +143,16 @@ service AccountService {
       body: "*"
     };
   }
+
+  // ========== Story 2.7: 账户元数据和标签查询 ==========
+
+  // ListAccountsByTags 通过标签查询账户（AND 逻辑）
+  rpc ListAccountsByTags(ListAccountsByTagsRequest) returns (ListAccountsByTagsResponse) {
+    option (google.api.http) = {
+      post: "/ListAccountsByTags"
+      body: "*"
+    };
+  }
 }
 
 // AccountProvider AI服务提供商枚举
@@ -441,4 +451,20 @@ message DeleteAccountGroupRequest {
 message DeleteAccountGroupResponse {
   bool Success = 1;  // 是否成功
   string Message = 2;  // 提示信息
+}
+
+// ========== Story 2.7: 账户元数据和标签查询消息定义 ==========
+
+// ListAccountsByTagsRequest 通过标签查询账户请求
+// 使用 AND 逻辑：返回包含所有指定标签的账户
+message ListAccountsByTagsRequest {
+  repeated string Tags = 1 [(validate.rules).repeated = {min_items: 1, max_items: 10}];  // 标签列表（1-10个，AND逻辑）
+  int32 Limit = 2 [(validate.rules).int32 = {gte: 1, lte: 100}];  // 返回数量限制（1-100，默认20）
+  int32 Offset = 3 [(validate.rules).int32 = {gte: 0}];  // 偏移量（默认0）
+}
+
+// ListAccountsByTagsResponse 通过标签查询账户响应
+message ListAccountsByTagsResponse {
+  repeated Account Accounts = 1;  // 账户列表（按健康分数降序、ID升序排序）
+  int32 Total = 2;                // 匹配的总数量
 }

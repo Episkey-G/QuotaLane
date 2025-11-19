@@ -22,4 +22,6 @@ type AccountRepo interface {
 	UpdateOAuthData(ctx context.Context, accountID int64, oauthData string, expiresAt time.Time) error
 	UpdateHealthScore(ctx context.Context, accountID int64, score int) error
 	UpdateAccountStatus(ctx context.Context, accountID int64, status data.AccountStatus) error
+	// Story 2-7: Tag-based account filtering
+	ListAccountsByTags(ctx context.Context, tags []string, limit, offset int) ([]*data.Account, error)
 }
