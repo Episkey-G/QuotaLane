@@ -314,39 +314,6 @@ func (uc *AccountUsecase) ResetHealthScoreByAdmin(ctx context.Context, accountID
 	return account, nil
 }
 
-// getProxyClient creates HTTP client with proxy configuration from account metadata.
-// Returns nil client if no proxy is configured or proxy is disabled.
-// Story 2-7: Proxy integration for Token refresh and health checks.
-func (uc *AccountUsecase) getProxyClient(account *data.Account) (*http.Client, error) {
-	// No metadata, return nil (no proxy)
-	if account.Metadata == nil || *account.Metadata == "" {
-		return nil, nil
-	}
-
-	// Parse metadata
-	meta, err := data.ParseMetadata(account.Metadata)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse account metadata: %w", err)
-	}
-
-	// No proxy configured or proxy disabled
-	if meta.ProxyURL == "" || !meta.ProxyEnabled {
-		return nil, nil
-	}
-
-	// Create proxy client with 30s timeout
-	client, err := util.CreateHTTPClient(meta.ProxyURL, 30*time.Second)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create proxy client: %w", err)
-	}
-
-	uc.logger.Debugw("proxy client created for account",
-		"account_id", account.ID,
-		"proxy_url", meta.ProxyURL)
-
-	return client, nil
-}
-
 // GetAccountsByTags retrieves accounts matching ALL specified tags (AND logic).
 // Story 2-7: Tag-based account filtering for grouping and organization.
 func (uc *AccountUsecase) GetAccountsByTags(ctx context.Context, tags []string, limit, offset int) ([]*v1.Account, error) {

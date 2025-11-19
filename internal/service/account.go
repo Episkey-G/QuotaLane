@@ -503,8 +503,11 @@ func (s *AccountService) ListAccountsByTags(ctx context.Context, req *v1.ListAcc
 		"limit", limit,
 		"offset", offset)
 
+	// Safe int to int32 conversion (len(accounts) is bounded by limit which is max 100)
+	total := int32(len(accounts)) // #nosec G115
+
 	return &v1.ListAccountsByTagsResponse{
 		Accounts: accounts,
-		Total:    int32(len(accounts)), // Note: This is the count of returned accounts, not total matching records
+		Total:    total, // Note: This is the count of returned accounts, not total matching records
 	}, nil
 }
