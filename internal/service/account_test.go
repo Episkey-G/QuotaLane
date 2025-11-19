@@ -94,6 +94,14 @@ func (m *MockAccountRepo) ListCodexCLIAccountsNeedingRefresh(ctx context.Context
 	return args.Get(0).([]*data.Account), args.Error(1)
 }
 
+func (m *MockAccountRepo) ListAccountsByTags(ctx context.Context, tags []string, limit, offset int) ([]*data.Account, error) {
+	args := m.Called(ctx, tags, limit, offset)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*data.Account), args.Error(1)
+}
+
 // MockOAuthService is a mock implementation of oauth.OAuthService for testing.
 type MockOAuthService struct {
 	mock.Mock
