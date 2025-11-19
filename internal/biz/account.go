@@ -3,8 +3,6 @@ package biz
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"time"
 
 	v1 "QuotaLane/api/v1"
 	"QuotaLane/internal/data"
@@ -12,7 +10,6 @@ import (
 	"QuotaLane/pkg/metadata"
 	"QuotaLane/pkg/oauth"
 	pkgoauth "QuotaLane/pkg/oauth" // 统一 OAuth Manager
-	"QuotaLane/pkg/oauth/util"
 	"QuotaLane/pkg/openai"
 
 	"github.com/go-kratos/kratos/v2/log"
